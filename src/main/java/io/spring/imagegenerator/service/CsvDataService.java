@@ -1,42 +1,51 @@
 package io.spring.imagegenerator.service;
 
-import java.io.FileReader;
-import java.io.IOException;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-
+import com.opencsv.CSVReader;
+import com.opencsv.exceptions.CsvException;
+import io.spring.imagegenerator.entity.*;
+import io.spring.imagegenerator.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.opencsv.CSVReader;
-import com.opencsv.exceptions.CsvException;
-
-import io.spring.imagegenerator.entity.Guest;
-import io.spring.imagegenerator.entity.Host;
-import io.spring.imagegenerator.entity.HostKakao;
-import io.spring.imagegenerator.entity.Photo;
-import io.spring.imagegenerator.entity.Space;
-import io.spring.imagegenerator.entity.SpaceContent;
-import io.spring.imagegenerator.entity.SpaceHostMap;
+import java.io.FileReader;
+import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 @Service
 @Transactional
 public class CsvDataService {
 
     @Autowired
-    private JdbcBulkInsertService jdbcBulkInsertService;
+    private SpaceRepository spaceRepository;
+    
+    @Autowired
+    private HostRepository hostRepository;
+    
+    @Autowired
+    private SpaceHostMapRepository spaceHostMapRepository;
+    
+    @Autowired
+    private HostKakaoRepository hostKakaoRepository;
+    
+    @Autowired
+    private GuestRepository guestRepository;
+    
+    @Autowired
+    private SpaceContentRepository spaceContentRepository;
+    
+    @Autowired
+    private PhotoRepository photoRepository;
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public void loadSpacesFromCsv(String filePath) {
         try (CSVReader reader = new CSVReader(new FileReader(filePath))) {
             List<String[]> records = reader.readAll();
-            int totalRecords = records.size() - 1;
+            int totalRecords = records.size() - 1; // 헤더 제외
             
-            List<Space> spaces = new ArrayList<>();
             for (int i = 1; i < records.size(); i++) {
                 String[] record = records.get(i);
                 
@@ -51,11 +60,14 @@ public class CsvDataService {
                     LocalDateTime.parse(record[8], FORMATTER) // updated_at
                 );
                 space.setId(Long.parseLong(record[0]));
-                spaces.add(space);
+                spaceRepository.save(space);
+                
+                // 10% 단위로 진행률 출력
+                int progress = (i * 100) / totalRecords;
+                if (i % Math.max(1, totalRecords / 10) == 0 || i == totalRecords) {
+                    System.out.printf("  Spaces: %d/%d (%d%%)\n", i, totalRecords, progress);
+                }
             }
-            
-            jdbcBulkInsertService.bulkInsertSpaces(spaces);
-            System.out.printf("  Spaces: %d/%d (100%%)\n", totalRecords, totalRecords);
         } catch (IOException | CsvException e) {
             throw new RuntimeException("Failed to load spaces from CSV", e);
         }
@@ -66,7 +78,6 @@ public class CsvDataService {
             List<String[]> records = reader.readAll();
             int totalRecords = records.size() - 1;
             
-            List<Host> hosts = new ArrayList<>();
             for (int i = 1; i < records.size(); i++) {
                 String[] record = records.get(i);
                 
@@ -78,11 +89,13 @@ public class CsvDataService {
                     LocalDateTime.parse(record[5], FORMATTER) // updated_at
                 );
                 host.setId(Long.parseLong(record[0]));
-                hosts.add(host);
+                hostRepository.save(host);
+                
+                int progress = (i * 100) / totalRecords;
+                if (i % Math.max(1, totalRecords / 10) == 0 || i == totalRecords) {
+                    System.out.printf("  Hosts: %d/%d (%d%%)\n", i, totalRecords, progress);
+                }
             }
-            
-            jdbcBulkInsertService.bulkInsertHosts(hosts);
-            System.out.printf("  Hosts: %d/%d (100%%)\n", totalRecords, totalRecords);
         } catch (IOException | CsvException e) {
             throw new RuntimeException("Failed to load hosts from CSV", e);
         }
@@ -93,7 +106,6 @@ public class CsvDataService {
             List<String[]> records = reader.readAll();
             int totalRecords = records.size() - 1;
             
-            List<SpaceHostMap> spaceHostMaps = new ArrayList<>();
             for (int i = 1; i < records.size(); i++) {
                 String[] record = records.get(i);
                 
@@ -104,11 +116,13 @@ public class CsvDataService {
                     LocalDateTime.parse(record[4], FORMATTER) // updated_at
                 );
                 spaceHostMap.setId(Long.parseLong(record[0]));
-                spaceHostMaps.add(spaceHostMap);
+                spaceHostMapRepository.save(spaceHostMap);
+                
+                int progress = (i * 100) / totalRecords;
+                if (i % Math.max(1, totalRecords / 10) == 0 || i == totalRecords) {
+                    System.out.printf("  SpaceHostMaps: %d/%d (%d%%)\n", i, totalRecords, progress);
+                }
             }
-            
-            jdbcBulkInsertService.bulkInsertSpaceHostMaps(spaceHostMaps);
-            System.out.printf("  SpaceHostMaps: %d/%d (100%%)\n", totalRecords, totalRecords);
         } catch (IOException | CsvException e) {
             throw new RuntimeException("Failed to load space host maps from CSV", e);
         }
@@ -119,7 +133,6 @@ public class CsvDataService {
             List<String[]> records = reader.readAll();
             int totalRecords = records.size() - 1;
             
-            List<HostKakao> hostKakaos = new ArrayList<>();
             for (int i = 1; i < records.size(); i++) {
                 String[] record = records.get(i);
                 
@@ -128,11 +141,13 @@ public class CsvDataService {
                     record[2] // user_id
                 );
                 hostKakao.setId(Long.parseLong(record[0]));
-                hostKakaos.add(hostKakao);
+                hostKakaoRepository.save(hostKakao);
+                
+                int progress = (i * 100) / totalRecords;
+                if (i % Math.max(1, totalRecords / 10) == 0 || i == totalRecords) {
+                    System.out.printf("  HostKakaos: %d/%d (%d%%)\n", i, totalRecords, progress);
+                }
             }
-            
-            jdbcBulkInsertService.bulkInsertHostKakaos(hostKakaos);
-            System.out.printf("  HostKakaos: %d/%d (100%%)\n", totalRecords, totalRecords);
         } catch (IOException | CsvException e) {
             throw new RuntimeException("Failed to load host kakaos from CSV", e);
         }
@@ -143,7 +158,6 @@ public class CsvDataService {
             List<String[]> records = reader.readAll();
             int totalRecords = records.size() - 1;
             
-            List<Guest> guests = new ArrayList<>();
             for (int i = 1; i < records.size(); i++) {
                 String[] record = records.get(i);
                 
@@ -154,11 +168,13 @@ public class CsvDataService {
                     LocalDateTime.parse(record[4], FORMATTER) // updated_at
                 );
                 guest.setId(Long.parseLong(record[0]));
-                guests.add(guest);
+                guestRepository.save(guest);
+                
+                int progress = (i * 100) / totalRecords;
+                if (i % Math.max(1, totalRecords / 10) == 0 || i == totalRecords) {
+                    System.out.printf("  Guests: %d/%d (%d%%)\n", i, totalRecords, progress);
+                }
             }
-            
-            jdbcBulkInsertService.bulkInsertGuests(guests);
-            System.out.printf("  Guests: %d/%d (100%%)\n", totalRecords, totalRecords);
         } catch (IOException | CsvException e) {
             throw new RuntimeException("Failed to load guests from CSV", e);
         }
@@ -169,7 +185,6 @@ public class CsvDataService {
             List<String[]> records = reader.readAll();
             int totalRecords = records.size() - 1;
             
-            List<SpaceContent> spaceContents = new ArrayList<>();
             for (int i = 1; i < records.size(); i++) {
                 String[] record = records.get(i);
                 
@@ -179,11 +194,13 @@ public class CsvDataService {
                     Long.parseLong(record[3]) // guest_id
                 );
                 spaceContent.setId(Long.parseLong(record[0]));
-                spaceContents.add(spaceContent);
+                spaceContentRepository.save(spaceContent);
+                
+                int progress = (i * 100) / totalRecords;
+                if (i % Math.max(1, totalRecords / 10) == 0 || i == totalRecords) {
+                    System.out.printf("  SpaceContents: %d/%d (%d%%)\n", i, totalRecords, progress);
+                }
             }
-            
-            jdbcBulkInsertService.bulkInsertSpaceContents(spaceContents);
-            System.out.printf("  SpaceContents: %d/%d (100%%)\n", totalRecords, totalRecords);
         } catch (IOException | CsvException e) {
             throw new RuntimeException("Failed to load space contents from CSV", e);
         }
@@ -194,7 +211,6 @@ public class CsvDataService {
             List<String[]> records = reader.readAll();
             int totalRecords = records.size() - 1;
             
-            List<Photo> photos = new ArrayList<>();
             for (int i = 1; i < records.size(); i++) {
                 String[] record = records.get(i);
                 
@@ -206,11 +222,13 @@ public class CsvDataService {
                     LocalDateTime.parse(record[5], FORMATTER) // created_at
                 );
                 photo.setId(Long.parseLong(record[0]));
-                photos.add(photo);
+                photoRepository.save(photo);
+                
+                int progress = (i * 100) / totalRecords;
+                if (i % Math.max(1, totalRecords / 10) == 0 || i == totalRecords) {
+                    System.out.printf("  Photos: %d/%d (%d%%)\n", i, totalRecords, progress);
+                }
             }
-            
-            jdbcBulkInsertService.bulkInsertPhotos(photos);
-            System.out.printf("  Photos: %d/%d (100%%)\n", totalRecords, totalRecords);
         } catch (IOException | CsvException e) {
             throw new RuntimeException("Failed to load photos from CSV", e);
         }
