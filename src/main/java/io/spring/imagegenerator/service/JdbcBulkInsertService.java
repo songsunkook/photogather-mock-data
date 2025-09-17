@@ -18,8 +18,10 @@ import io.spring.imagegenerator.entity.Photo;
 import io.spring.imagegenerator.entity.Space;
 import io.spring.imagegenerator.entity.SpaceContent;
 import io.spring.imagegenerator.entity.SpaceHostMap;
+import jakarta.transaction.Transactional;
 
 @Service
+@Transactional
 public class JdbcBulkInsertService {
 
     private static final int BATCH_SIZE = 1000;
