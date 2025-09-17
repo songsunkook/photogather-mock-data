@@ -22,22 +22,22 @@ public class DataLoader implements CommandLineRunner {
         System.out.println("Loading CSV data...");
         long totalStartTime = System.currentTimeMillis();
         
-//         // 1. Spaces (10%)
-//         long startTime = System.currentTimeMillis();
-//         csvDataService.loadSpacesFromCsv(csvDataPath + "/1_space.csv");
-//         long endTime = System.currentTimeMillis();
-//         System.out.println("[10%] Loaded spaces - " + (endTime - startTime) + "ms");
-//         
-//         // 2. Hosts (20%)
-//         startTime = System.currentTimeMillis();
-//         csvDataService.loadHostsFromCsv(csvDataPath + "/2_host.csv");
-//         endTime = System.currentTimeMillis();
-//         System.out.println("[20%] Loaded hosts - " + (endTime - startTime) + "ms");
+        // 1. Spaces (10%)
+        long startTime = System.currentTimeMillis();
+        csvDataService.loadSpacesFromCsv(csvDataPath + "/1_space.csv");
+        long endTime = System.currentTimeMillis();
+        System.out.println("[10%] Loaded spaces - " + (endTime - startTime) + "ms");
+        
+        // 2. Hosts (20%)
+        startTime = System.currentTimeMillis();
+        csvDataService.loadHostsFromCsv(csvDataPath + "/2_host.csv");
+        endTime = System.currentTimeMillis();
+        System.out.println("[20%] Loaded hosts - " + (endTime - startTime) + "ms");
         
         // 3. Space Host Maps (30%)
-        long startTime = System.currentTimeMillis();
+        startTime = System.currentTimeMillis();
         csvDataService.loadSpaceHostMapsFromCsv(csvDataPath + "/3_space_host_map.csv");
-        long endTime = System.currentTimeMillis();
+        endTime = System.currentTimeMillis();
         System.out.println("[30%] Loaded space host maps - " + (endTime - startTime) + "ms");
         
         // 4. Host Kakaos (50%)
