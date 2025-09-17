@@ -1,5 +1,9 @@
 {
   "permissions": {
+    "allow": [
+      "Bash(java:*)",
+      "Bash(mysql:*)"
+    ],
     "defaultMode": "acceptEdits"
   }
 }
