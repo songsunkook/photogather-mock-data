@@ -4,6 +4,8 @@ import javax.sql.DataSource;
 
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
+import org.springframework.batch.core.StepExecution;
+import org.springframework.batch.core.annotation.BeforeStep;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
@@ -307,11 +309,29 @@ public class BatchConfiguration {
         private final ItemWriter<T> delegate;
         private final long reportInterval;
         private long processedCount = 0;
+        private StepExecution stepExecution;
+        private boolean isRestart = false;
+        private long startReadCount = 0;
+        private Long firstRecordId = null;
+        private Long lastRecordId = null;
         
         public ProgressReportingWriter(String entityName, ItemWriter<T> delegate, long reportInterval) {
             this.entityName = entityName;
             this.delegate = delegate;
             this.reportInterval = reportInterval;
+        }
+        
+        @BeforeStep
+        public void beforeStep(StepExecution stepExecution) {
+            this.stepExecution = stepExecution;
+            this.startReadCount = stepExecution.getReadCount();
+            this.isRestart = startReadCount > 0;
+            
+            if (isRestart) {
+                System.out.printf("  %s: Restarting from CSV line %d\n", entityName, startReadCount + 1);
+            } else {
+                System.out.printf("  %s: Starting from beginning\n", entityName);
+            }
         }
         
         @Override
@@ -320,12 +340,35 @@ public class BatchConfiguration {
             
             processedCount += chunk.size();
             
+            // Extract IDs from the chunk to show actual data range
+            if (!chunk.isEmpty()) {
+                Object firstItem = chunk.getItems().get(0);
+                Object lastItem = chunk.getItems().get(chunk.size() - 1);
+                
+                try {
+                    // Try to get ID using reflection
+                    Long firstId = (Long) firstItem.getClass().getMethod("getId").invoke(firstItem);
+                    Long lastId = (Long) lastItem.getClass().getMethod("getId").invoke(lastItem);
+                    
+                    if (firstRecordId == null) firstRecordId = firstId;
+                    lastRecordId = lastId;
+                } catch (Exception e) {
+                    // Fallback if reflection fails
+                }
+            }
+            
             // Report progress every reportInterval items
             if (processedCount % reportInterval == 0 || 
                 (processedCount % reportInterval < chunk.size() && processedCount >= reportInterval)) {
                 long reportCount = (processedCount / reportInterval) * reportInterval;
                 if (reportCount > 0) {
-                    System.out.printf("  %s: Processed %d records\n", entityName, reportCount);
+                    long totalReadCount = startReadCount + reportCount;
+                    
+                    if (lastRecordId != null) {
+                        System.out.printf("  ✓ %s: ID %d\n", entityName, lastRecordId);
+                    } else {
+                        System.out.printf("  ✓ %s: %d records\n", entityName, reportCount);
+                    }
                 }
             }
         }
