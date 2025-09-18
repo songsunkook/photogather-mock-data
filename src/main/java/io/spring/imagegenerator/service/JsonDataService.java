@@ -1,6 +1,6 @@
 package io.spring.imagegenerator.service;
 
-import java.io.FileReader;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -11,6 +11,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateTimeDeserializer;
@@ -69,104 +73,268 @@ public class JsonDataService {
         this.objectMapper.registerModule(javaTimeModule);
     }
 
-    @Transactional
     public void loadSpaceFromJson(String filePath) {
-        try (FileReader reader = new FileReader(filePath)) {
-            JsonSpaceData jsonData = objectMapper.readValue(reader, JsonSpaceData.class);
+        long totalStartTime = System.currentTimeMillis();
+        
+        try (FileInputStream fis = new FileInputStream(filePath);
+             JsonParser parser = new JsonFactory().createParser(fis)) {
             
-            List<JsonSpaceData.SpaceData> spacesToProcess = new ArrayList<>();
+            int processedCount = 0;
+            int batchSize = 100; // 배치 사이즈 설정
+            List<JsonSpaceData.SpaceData> batch = new ArrayList<>();
             
-            if (jsonData.getSpace() != null) {
-                spacesToProcess.add(jsonData.getSpace());
+            System.out.printf("Starting to process JSON file: %s\n", filePath);
+            
+            if (parser.nextToken() == JsonToken.START_OBJECT) {
+                while (parser.nextToken() != JsonToken.END_OBJECT) {
+                    String fieldName = parser.getCurrentName();
+                    parser.nextToken();
+                    
+                    if ("space".equals(fieldName)) {
+                        JsonSpaceData.SpaceData spaceData = objectMapper.readValue(parser, JsonSpaceData.SpaceData.class);
+                        batch.add(spaceData);
+                        processedCount++;
+                        
+                        if (batch.size() >= batchSize) {
+                            processBatch(batch);
+                            batch.clear();
+                            System.gc(); // 메모리 정리
+                        }
+                    } else if ("spaces".equals(fieldName) && parser.getCurrentToken() == JsonToken.START_ARRAY) {
+                        while (parser.nextToken() != JsonToken.END_ARRAY) {
+                            JsonSpaceData.SpaceData spaceData = objectMapper.readValue(parser, JsonSpaceData.SpaceData.class);
+                            batch.add(spaceData);
+                            processedCount++;
+                            
+                            if (batch.size() >= batchSize) {
+                                processBatch(batch);
+                                batch.clear();
+                                System.gc(); // 메모리 정리
+                                
+                                if (processedCount % 1000 == 0) {
+                                    long currentTime = System.currentTimeMillis();
+                                    long elapsedTime = currentTime - totalStartTime;
+                                    double avgTimePerSpace = (double) elapsedTime / processedCount;
+                                    System.out.printf("Progress: %d spaces processed in %d ms (avg: %.2f ms/space)\n", 
+                                        processedCount, elapsedTime, avgTimePerSpace);
+                                }
+                            }
+                        }
+                    }
+                }
             }
             
-            if (jsonData.getSpaces() != null) {
-                spacesToProcess.addAll(jsonData.getSpaces());
+            // 남은 배치 처리
+            if (!batch.isEmpty()) {
+                processBatch(batch);
             }
             
-            for (JsonSpaceData.SpaceData spaceData : spacesToProcess) {
-                processSpaceData(spaceData);
-            }
+            long totalEndTime = System.currentTimeMillis();
+            long totalTime = totalEndTime - totalStartTime;
+            double avgTimePerSpace = processedCount > 0 ? (double) totalTime / processedCount : 0;
             
-            System.out.printf("Successfully processed %d space(s) from JSON file\n", spacesToProcess.size());
+            System.out.printf("=== PROCESSING COMPLETE ===\n");
+            System.out.printf("Total spaces processed: %d\n", processedCount);
+            System.out.printf("Total time: %d ms (%.2f seconds)\n", totalTime, totalTime / 1000.0);
+            System.out.printf("Average time per space: %.2f ms\n", avgTimePerSpace);
+            System.out.printf("Processing rate: %.2f spaces/second\n", processedCount > 0 ? (processedCount * 1000.0 / totalTime) : 0);
+            
         } catch (IOException e) {
             throw new RuntimeException("Failed to load space from JSON", e);
         }
     }
     
-    private void processSpaceData(JsonSpaceData.SpaceData spaceData) {
-        Space space = new Space(
-            spaceData.getCode(),
-            spaceData.getName(),
-            spaceData.getValidHours(),
-            spaceData.getOpenedAt(),
-            spaceData.getMaxCapacity(),
-            Space.SpaceType.valueOf(spaceData.getType()),
-            spaceData.getCreatedAt(),
-            spaceData.getUpdatedAt()
-        );
-        space = spaceRepository.save(space);
-        System.out.printf("Space created with ID: %d\n", space.getId());
+    @Transactional
+    private void processBatch(List<JsonSpaceData.SpaceData> batch) {
+        long batchStartTime = System.currentTimeMillis();
         
-        if (spaceData.getHost() != null) {
-            Host host = createHost(spaceData.getHost());
-            host = hostRepository.save(host);
-            System.out.printf("Host created with ID: %d\n", host.getId());
-            
-            SpaceHostMap spaceHostMap = new SpaceHostMap(
-                space.getId(),
-                host.getId(),
-                LocalDateTime.now(),
-                LocalDateTime.now()
+        List<Space> spaces = new ArrayList<>();
+        List<Host> hosts = new ArrayList<>();
+        List<SpaceHostMap> spaceHostMaps = new ArrayList<>();
+        List<HostKakao> hostKakaos = new ArrayList<>();
+        List<Guest> guests = new ArrayList<>();
+        List<SpaceContent> spaceContents = new ArrayList<>();
+        int photoCount = 0;
+        
+        for (JsonSpaceData.SpaceData spaceData : batch) {
+            Space space = new Space(
+                spaceData.getCode(),
+                spaceData.getName(),
+                spaceData.getValidHours(),
+                spaceData.getOpenedAt(),
+                spaceData.getMaxCapacity(),
+                Space.SpaceType.valueOf(spaceData.getType()),
+                spaceData.getCreatedAt(),
+                spaceData.getUpdatedAt()
             );
-            spaceHostMapRepository.save(spaceHostMap);
-            System.out.printf("SpaceHostMap created\n");
+            spaces.add(space);
+        }
+        
+        // 1. Spaces 저장
+        long spaceSaveStart = System.currentTimeMillis();
+        List<Space> savedSpaces = spaceRepository.saveAll(spaces);
+        long spaceSaveEnd = System.currentTimeMillis();
+        
+        // 2. 각 Space에 대해 관련 데이터 처리
+        for (int i = 0; i < batch.size(); i++) {
+            JsonSpaceData.SpaceData spaceData = batch.get(i);
+            Space space = savedSpaces.get(i);
             
-            if (spaceData.getHost().getKakao() != null) {
-                HostKakao hostKakao = new HostKakao(
-                    host.getId(),
-                    spaceData.getHost().getKakao().getUserId()
-                );
-                hostKakaoRepository.save(hostKakao);
-                System.out.printf("HostKakao created\n");
+            if (spaceData.getHost() != null) {
+                Host host = createHost(spaceData.getHost());
+                hosts.add(host);
             }
         }
         
-        if (spaceData.getGuests() != null) {
-            for (JsonSpaceData.GuestData guestData : spaceData.getGuests()) {
-                Guest guest = new Guest(
-                    space.getId(),
-                    guestData.getName(),
-                    guestData.getCreatedAt(),
-                    guestData.getUpdatedAt()
-                );
-                guest = guestRepository.save(guest);
-                System.out.printf("Guest created with ID: %d\n", guest.getId());
+        // 3. Hosts 저장
+        long hostSaveStart = System.currentTimeMillis();
+        long hostSaveEnd = hostSaveStart;
+        if (!hosts.isEmpty()) {
+            List<Host> savedHosts = hostRepository.saveAll(hosts);
+            hostSaveEnd = System.currentTimeMillis();
+            
+            // 4. SpaceHostMaps 생성
+            int hostIndex = 0;
+            for (int i = 0; i < batch.size(); i++) {
+                JsonSpaceData.SpaceData spaceData = batch.get(i);
+                Space space = savedSpaces.get(i);
                 
-                if (guestData.getPhotos() != null) {
-                    for (JsonSpaceData.PhotoData photoData : guestData.getPhotos()) {
-                        SpaceContent spaceContent = new SpaceContent(
-                            SpaceContent.ContentType.valueOf(photoData.getContentType()),
-                            space.getId(),
-                            guest.getId()
+                if (spaceData.getHost() != null) {
+                    Host host = savedHosts.get(hostIndex);
+                    SpaceHostMap spaceHostMap = new SpaceHostMap(
+                        space.getId(),
+                        host.getId(),
+                        LocalDateTime.now(),
+                        LocalDateTime.now()
+                    );
+                    spaceHostMaps.add(spaceHostMap);
+                    
+                    if (spaceData.getHost().getKakao() != null) {
+                        HostKakao hostKakao = new HostKakao(
+                            host.getId(),
+                            spaceData.getHost().getKakao().getUserId()
                         );
-                        spaceContent = spaceContentRepository.save(spaceContent);
-                        System.out.printf("SpaceContent created with ID: %d\n", spaceContent.getId());
-                        
-                        Photo photo = new Photo(
-                            photoData.getOriginalName(),
-                            photoData.getPath(),
-                            photoData.getCapturedAt(),
-                            photoData.getCapacity(),
-                            photoData.getCreatedAt()
-                        );
-                        photo.setId(spaceContent.getId());
-                        photo = photoRepository.save(photo);
-                        System.out.printf("Photo created with ID: %d\n", photo.getId());
+                        hostKakaos.add(hostKakao);
                     }
+                    hostIndex++;
+                }
+            }
+            
+            // 5. SpaceHostMaps와 HostKakaos 저장
+            if (!spaceHostMaps.isEmpty()) {
+                spaceHostMapRepository.saveAll(spaceHostMaps);
+            }
+            if (!hostKakaos.isEmpty()) {
+                hostKakaoRepository.saveAll(hostKakaos);
+            }
+        }
+        
+        // 6. Guests, SpaceContents, Photos 처리
+        for (int i = 0; i < batch.size(); i++) {
+            JsonSpaceData.SpaceData spaceData = batch.get(i);
+            Space space = savedSpaces.get(i);
+            
+            if (spaceData.getGuests() != null) {
+                for (JsonSpaceData.GuestData guestData : spaceData.getGuests()) {
+                    Guest guest = new Guest(
+                        space.getId(),
+                        guestData.getName(),
+                        guestData.getCreatedAt(),
+                        guestData.getUpdatedAt()
+                    );
+                    guests.add(guest);
                 }
             }
         }
+        
+        // 7. Guests 저장 후 Photos 처리
+        long guestSaveStart = System.currentTimeMillis();
+        long guestSaveEnd = guestSaveStart;
+        long spaceContentSaveStart = System.currentTimeMillis();
+        long spaceContentSaveEnd = spaceContentSaveStart;
+        long photoSaveStart = System.currentTimeMillis();
+        long photoSaveEnd = photoSaveStart;
+        
+        if (!guests.isEmpty()) {
+            List<Guest> savedGuests = guestRepository.saveAll(guests);
+            guestSaveEnd = System.currentTimeMillis();
+            
+            int guestIndex = 0;
+            for (int i = 0; i < batch.size(); i++) {
+                JsonSpaceData.SpaceData spaceData = batch.get(i);
+                Space space = savedSpaces.get(i);
+                
+                if (spaceData.getGuests() != null) {
+                    for (JsonSpaceData.GuestData guestData : spaceData.getGuests()) {
+                        Guest guest = savedGuests.get(guestIndex);
+                        
+                        if (guestData.getPhotos() != null) {
+                            for (JsonSpaceData.PhotoData photoData : guestData.getPhotos()) {
+                                SpaceContent spaceContent = new SpaceContent(
+                                    SpaceContent.ContentType.valueOf(photoData.getContentType()),
+                                    space.getId(),
+                                    guest.getId()
+                                );
+                                spaceContents.add(spaceContent);
+                            }
+                        }
+                        guestIndex++;
+                    }
+                }
+            }
+            
+            // 8. SpaceContents 저장 후 Photos 개별 저장
+            if (!spaceContents.isEmpty()) {
+                spaceContentSaveStart = System.currentTimeMillis();
+                List<SpaceContent> savedSpaceContents = spaceContentRepository.saveAll(spaceContents);
+                spaceContentSaveEnd = System.currentTimeMillis();
+                
+                photoSaveStart = System.currentTimeMillis();
+                
+                int spaceContentIndex = 0;
+                guestIndex = 0;
+                
+                for (int i = 0; i < batch.size(); i++) {
+                    JsonSpaceData.SpaceData spaceData = batch.get(i);
+                    
+                    if (spaceData.getGuests() != null) {
+                        for (JsonSpaceData.GuestData guestData : spaceData.getGuests()) {
+                            if (guestData.getPhotos() != null) {
+                                for (JsonSpaceData.PhotoData photoData : guestData.getPhotos()) {
+                                    SpaceContent spaceContent = savedSpaceContents.get(spaceContentIndex);
+                                    
+                                    Photo photo = new Photo(
+                                        photoData.getOriginalName(),
+                                        photoData.getPath(),
+                                        photoData.getCapturedAt(),
+                                        photoData.getCapacity(),
+                                        photoData.getCreatedAt()
+                                    );
+                                    // ID만 직접 설정 (SpaceContent 객체 참조 없이)
+                                    photo.setId(spaceContent.getId());
+                                    photoRepository.save(photo); // 개별 저장
+                                    photoCount++;
+                                    spaceContentIndex++;
+                                }
+                            }
+                            guestIndex++;
+                        }
+                    }
+                }
+                photoSaveEnd = System.currentTimeMillis();
+            }
+        }
+        
+        long batchEndTime = System.currentTimeMillis();
+        long totalBatchTime = batchEndTime - batchStartTime;
+        
+        System.out.printf("Batch: %d spaces (%dms), %d hosts (%dms), %d guests (%dms), %d content (%dms), %d photos (%dms) | Total: %dms\n", 
+            spaces.size(), (spaceSaveEnd - spaceSaveStart), 
+            hosts.size(), (hostSaveEnd - hostSaveStart), 
+            guests.size(), (guestSaveEnd - guestSaveStart),
+            spaceContents.size(), (spaceContentSaveEnd - spaceContentSaveStart),
+            photoCount, (photoSaveEnd - photoSaveStart),
+            totalBatchTime);
     }
     
     private Host createHost(JsonSpaceData.HostData hostData) {

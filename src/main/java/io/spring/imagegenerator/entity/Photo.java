@@ -37,7 +37,6 @@ public class Photo {
     
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id")
-    @MapsId
     private SpaceContent spaceContent;
     
     public Photo() {}
