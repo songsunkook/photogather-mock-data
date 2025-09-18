@@ -87,8 +87,16 @@ public class BatchConfiguration {
                 .sql("INSERT INTO host (id, name, picture_url, agreed_terms, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)")
                 .itemPreparedStatementSetter((host, ps) -> {
                     ps.setLong(1, host.getId());
-                    ps.setString(2, host.getName());
-                    ps.setString(3, host.getPictureUrl());
+                    if (host.getName() != null) {
+                        ps.setString(2, host.getName());
+                    } else {
+                        ps.setNull(2, java.sql.Types.VARCHAR);
+                    }
+                    if (host.getPictureUrl() != null) {
+                        ps.setString(3, host.getPictureUrl());
+                    } else {
+                        ps.setNull(3, java.sql.Types.VARCHAR);
+                    }
                     ps.setBoolean(4, host.getAgreedTerms());
                     ps.setTimestamp(5, java.sql.Timestamp.valueOf(host.getCreatedAt()));
                     ps.setTimestamp(6, java.sql.Timestamp.valueOf(host.getUpdatedAt()));
@@ -107,8 +115,16 @@ public class BatchConfiguration {
                     ps.setLong(1, spaceHostMap.getId());
                     ps.setLong(2, spaceHostMap.getSpaceId());
                     ps.setLong(3, spaceHostMap.getHostId());
-                    ps.setTimestamp(4, java.sql.Timestamp.valueOf(spaceHostMap.getCreatedAt()));
-                    ps.setTimestamp(5, java.sql.Timestamp.valueOf(spaceHostMap.getUpdatedAt()));
+                    if (spaceHostMap.getCreatedAt() != null) {
+                        ps.setTimestamp(4, java.sql.Timestamp.valueOf(spaceHostMap.getCreatedAt()));
+                    } else {
+                        ps.setNull(4, java.sql.Types.TIMESTAMP);
+                    }
+                    if (spaceHostMap.getUpdatedAt() != null) {
+                        ps.setTimestamp(5, java.sql.Timestamp.valueOf(spaceHostMap.getUpdatedAt()));
+                    } else {
+                        ps.setNull(5, java.sql.Types.TIMESTAMP);
+                    }
                 })
                 .build();
         
@@ -138,7 +154,11 @@ public class BatchConfiguration {
                 .itemPreparedStatementSetter((guest, ps) -> {
                     ps.setLong(1, guest.getId());
                     ps.setLong(2, guest.getSpaceId());
-                    ps.setString(3, guest.getName());
+                    if (guest.getName() != null) {
+                        ps.setString(3, guest.getName());
+                    } else {
+                        ps.setNull(3, java.sql.Types.VARCHAR);
+                    }
                     ps.setTimestamp(4, java.sql.Timestamp.valueOf(guest.getCreatedAt()));
                     ps.setTimestamp(5, java.sql.Timestamp.valueOf(guest.getUpdatedAt()));
                 })
@@ -156,7 +176,11 @@ public class BatchConfiguration {
                     ps.setLong(1, spaceContent.getId());
                     ps.setString(2, spaceContent.getContentType().name());
                     ps.setLong(3, spaceContent.getSpaceId());
-                    ps.setLong(4, spaceContent.getGuestId());
+                    if (spaceContent.getGuestId() != null) {
+                        ps.setLong(4, spaceContent.getGuestId());
+                    } else {
+                        ps.setNull(4, java.sql.Types.BIGINT);
+                    }
                 })
                 .build();
         
@@ -172,7 +196,11 @@ public class BatchConfiguration {
                     ps.setLong(1, photo.getId());
                     ps.setString(2, photo.getOriginalName());
                     ps.setString(3, photo.getPath());
-                    ps.setTimestamp(4, java.sql.Timestamp.valueOf(photo.getCapturedAt()));
+                    if (photo.getCapturedAt() != null) {
+                        ps.setTimestamp(4, java.sql.Timestamp.valueOf(photo.getCapturedAt()));
+                    } else {
+                        ps.setNull(4, java.sql.Types.TIMESTAMP);
+                    }
                     ps.setLong(5, photo.getCapacity());
                     ps.setTimestamp(6, java.sql.Timestamp.valueOf(photo.getCreatedAt()));
                 })

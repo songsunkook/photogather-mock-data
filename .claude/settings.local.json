@@ -4,6 +4,9 @@
       "Bash(java:*)",
       "Bash(mysql:*)"
     ],
-    "defaultMode": "acceptEdits"
+    "defaultMode": "acceptEdits",
+    "additionalDirectories": [
+      "/Users/songsunkook/내"
+    ]
   }
 }
