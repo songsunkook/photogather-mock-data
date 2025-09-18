@@ -6,9 +6,13 @@ import java.util.List;
 
 public class JsonSpaceData {
     private SpaceData space;
+    private List<SpaceData> spaces;
     
     public SpaceData getSpace() { return space; }
     public void setSpace(SpaceData space) { this.space = space; }
+    
+    public List<SpaceData> getSpaces() { return spaces; }
+    public void setSpaces(List<SpaceData> spaces) { this.spaces = spaces; }
     
     public static class SpaceData {
         private String code;
