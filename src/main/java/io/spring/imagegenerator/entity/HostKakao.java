@@ -7,6 +7,7 @@ import jakarta.persistence.*;
 public class HostKakao {
     
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
     @Column(name = "host_id", nullable = false)

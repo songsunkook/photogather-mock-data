@@ -7,6 +7,7 @@ import jakarta.persistence.*;
 public class SpaceContent {
     
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
     @Enumerated(EnumType.STRING)

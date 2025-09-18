@@ -68,16 +68,15 @@ public class CsvDataService {
                 recordCount++;
                 
                 Space space = new Space(
-                    record[1], // code
-                    record[2].replace("\"", ""), // name
-                    Integer.parseInt(record[3]), // valid_hours
-                    LocalDateTime.parse(record[4], FORMATTER), // opened_at
-                    Long.parseLong(record[5]), // max_capacity
-                    Space.SpaceType.valueOf(record[6]), // type
-                    LocalDateTime.parse(record[7], FORMATTER), // created_at
-                    LocalDateTime.parse(record[8], FORMATTER) // updated_at
+                    record[0], // code
+                    record[1].replace("\"", ""), // name
+                    Integer.parseInt(record[2]), // valid_hours
+                    LocalDateTime.parse(record[3], FORMATTER), // opened_at
+                    Long.parseLong(record[4]), // max_capacity
+                    Space.SpaceType.valueOf(record[5]), // type
+                    LocalDateTime.parse(record[6], FORMATTER), // created_at
+                    LocalDateTime.parse(record[7], FORMATTER) // updated_at
                 );
-                space.setId(Long.parseLong(record[0]));
                 spaces.add(space);
                 
                 // Process in batches of 10000 to manage memory
@@ -116,13 +115,12 @@ public class CsvDataService {
                 recordCount++;
                 
                 Host host = new Host(
-                    record[1].replace("\"", ""), // name
-                    record[2], // picture_url
-                    Boolean.parseBoolean(record[3]), // agreed_terms
-                    LocalDateTime.parse(record[4], FORMATTER), // created_at
-                    LocalDateTime.parse(record[5], FORMATTER) // updated_at
+                    record[0].replace("\"", ""), // name
+                    record[1], // picture_url
+                    Boolean.parseBoolean(record[2]), // agreed_terms
+                    LocalDateTime.parse(record[3], FORMATTER), // created_at
+                    LocalDateTime.parse(record[4], FORMATTER) // updated_at
                 );
-                host.setId(Long.parseLong(record[0]));
                 hosts.add(host);
                 
                 // Process in batches of 10000 to manage memory
@@ -161,12 +159,11 @@ public class CsvDataService {
                 recordCount++;
                 
                 SpaceHostMap spaceHostMap = new SpaceHostMap(
-                    Long.parseLong(record[1]), // space_id
-                    Long.parseLong(record[2]), // host_id
-                    LocalDateTime.parse(record[3], FORMATTER), // created_at
-                    LocalDateTime.parse(record[4], FORMATTER) // updated_at
+                    Long.parseLong(record[0]), // space_id
+                    Long.parseLong(record[1]), // host_id
+                    LocalDateTime.parse(record[2], FORMATTER), // created_at
+                    LocalDateTime.parse(record[3], FORMATTER) // updated_at
                 );
-                spaceHostMap.setId(Long.parseLong(record[0]));
                 spaceHostMaps.add(spaceHostMap);
                 
                 // Process in batches of 10000 to manage memory
@@ -205,10 +202,9 @@ public class CsvDataService {
                 recordCount++;
                 
                 HostKakao hostKakao = new HostKakao(
-                    Long.parseLong(record[1]), // host_id
-                    record[2] // user_id
+                    Long.parseLong(record[0]), // host_id
+                    record[1] // user_id
                 );
-                hostKakao.setId(Long.parseLong(record[0]));
                 hostKakaos.add(hostKakao);
                 
                 // Process in batches of 10000 to manage memory
@@ -247,12 +243,11 @@ public class CsvDataService {
                 recordCount++;
                 
                 Guest guest = new Guest(
-                    Long.parseLong(record[1]), // space_id
-                    record[2].replace("\"", ""), // name
-                    LocalDateTime.parse(record[3], FORMATTER), // created_at
-                    LocalDateTime.parse(record[4], FORMATTER) // updated_at
+                    Long.parseLong(record[0]), // space_id
+                    record[1].replace("\"", ""), // name
+                    LocalDateTime.parse(record[2], FORMATTER), // created_at
+                    LocalDateTime.parse(record[3], FORMATTER) // updated_at
                 );
-                guest.setId(Long.parseLong(record[0]));
                 guests.add(guest);
                 
                 // Process in batches of 10000 to manage memory
@@ -291,11 +286,10 @@ public class CsvDataService {
                 recordCount++;
                 
                 SpaceContent spaceContent = new SpaceContent(
-                    SpaceContent.ContentType.valueOf(record[1]), // content_type
-                    Long.parseLong(record[2]), // space_id
-                    Long.parseLong(record[3]) // guest_id
+                    SpaceContent.ContentType.valueOf(record[0]), // content_type
+                    Long.parseLong(record[1]), // space_id
+                    Long.parseLong(record[2]) // guest_id
                 );
-                spaceContent.setId(Long.parseLong(record[0]));
                 spaceContents.add(spaceContent);
                 
                 // Process in batches of 10000 to manage memory
@@ -334,13 +328,12 @@ public class CsvDataService {
                 recordCount++;
                 
                 Photo photo = new Photo(
-                    record[1].replace("\"", ""), // original_name
-                    record[2].replace("\"", ""), // path
-                    LocalDateTime.parse(record[3], FORMATTER), // captured_at
-                    Long.parseLong(record[4]), // capacity
-                    LocalDateTime.parse(record[5], FORMATTER) // created_at
+                    record[0].replace("\"", ""), // original_name
+                    record[1].replace("\"", ""), // path
+                    LocalDateTime.parse(record[2], FORMATTER), // captured_at
+                    Long.parseLong(record[3]), // capacity
+                    LocalDateTime.parse(record[4], FORMATTER) // created_at
                 );
-                photo.setId(Long.parseLong(record[0]));
                 photos.add(photo);
                 
                 // Process in batches of 10000 to manage memory
