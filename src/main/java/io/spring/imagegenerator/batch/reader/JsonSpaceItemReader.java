@@ -79,8 +79,7 @@ public class JsonSpaceItemReader implements ItemReader<JsonSpaceData.SpaceData>,
                     if (parser.getCurrentToken() == JsonToken.START_OBJECT) {
                         // Read one SpaceData object
                         JsonSpaceData.SpaceData spaceData = objectMapper.readValue(parser, JsonSpaceData.SpaceData.class);
-                        processedCount++;
-                        
+
                         // Skip logic for restart
                         if (totalSkipped < skipCount) {
                             totalSkipped++;
@@ -89,12 +88,14 @@ public class JsonSpaceItemReader implements ItemReader<JsonSpaceData.SpaceData>,
                             }
                             continue; // Skip this item
                         }
-                        
+
+                        processedCount++; // 스킵하지 않은 경우에만 카운트
+
                         // Progress reporting
                         if (processedCount % 100 == 0) {
                             System.out.printf("[JSON Reader] Progress: %d spaces read from JSON (skipped: %d)\n", processedCount, totalSkipped);
                         }
-                        
+
                         return spaceData;
                     } else if (parser.getCurrentToken() == JsonToken.END_ARRAY) {
                         // End of spaces array
@@ -143,6 +144,13 @@ public class JsonSpaceItemReader implements ItemReader<JsonSpaceData.SpaceData>,
     @Override
     public void open(ExecutionContext executionContext) throws ItemStreamException {
         try {
+            // ExecutionContext에서 이전 진행 상황 복원
+            if (executionContext.containsKey("processedCount")) {
+                processedCount = executionContext.getLong("processedCount");
+                skipCount = processedCount; // 이미 처리된 만큼 스킵
+                System.out.printf("[JSON Reader] Restarting from position: %d (will skip %d items)\n", processedCount, skipCount);
+            }
+
             if (!initialized) {
                 initializeReader();
                 initialized = true;

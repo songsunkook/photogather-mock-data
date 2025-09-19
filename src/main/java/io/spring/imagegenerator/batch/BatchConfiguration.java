@@ -250,9 +250,8 @@ public class BatchConfiguration {
 
     @Bean
     public JsonSpaceItemReader jsonSpaceItemReader() {
-        // 재시작 시 스킵 수를 동적으로 결정하는 로직이 필요하지만
-        // 지금은 기본값 0으로 설정
-        return new JsonSpaceItemReader(jsonFilePath, 0);
+        // ExecutionContext에서 자동으로 재시작 위치를 복원하므로 skipCount는 0으로 초기화
+        return new JsonSpaceItemReader(jsonFilePath);
     }
 
     @Bean

@@ -36,10 +36,10 @@ public class JsonDataService {
     
     public void executeJsonDataImport() {
         try {
-            JobParameters jobParameters = new JobParametersBuilder()
-                    .addLong("time", System.currentTimeMillis())
-                    .toJobParameters();
-            // JobParameters jobParameters = new JobParameters();
+            // JobParameters jobParameters = new JobParametersBuilder()
+            //         .addLong("time", System.currentTimeMillis())
+            //         .toJobParameters();
+            JobParameters jobParameters = new JobParameters();
             
             // 기존에 실행중이거나 완료되지 않은 Job이 있는지 확인
             List<JobInstance> jobInstances = jobExplorer.getJobInstances(jsonImportJob.getName(), 0, 20);
