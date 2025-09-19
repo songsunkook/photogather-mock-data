@@ -253,7 +253,7 @@ public class JdbcBulkInsertService {
                     ps.setLong(1, photo.getId());
                     ps.setString(2, photo.getOriginalName());
                     ps.setString(3, photo.getPath());
-                    ps.setTimestamp(4, Timestamp.valueOf(photo.getCapturedAt()));
+                    ps.setTimestamp(4, photo.getCapturedAt() != null ? Timestamp.valueOf(photo.getCapturedAt()) : null);
                     ps.setLong(5, photo.getCapacity());
                     ps.setTimestamp(6, Timestamp.valueOf(photo.getCreatedAt()));
                 }
