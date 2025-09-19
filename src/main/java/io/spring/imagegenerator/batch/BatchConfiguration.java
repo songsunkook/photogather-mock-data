@@ -14,10 +14,14 @@ import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.database.JdbcBatchItemWriter;
 import org.springframework.batch.item.database.builder.JdbcBatchItemWriterBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import io.spring.imagegenerator.batch.processor.JsonProcessedData;
+import io.spring.imagegenerator.batch.processor.JsonSpaceProcessor;
+import io.spring.imagegenerator.batch.reader.JsonSpaceItemReader;
 import io.spring.imagegenerator.batch.step.GuestBatchStep;
 import io.spring.imagegenerator.batch.step.HostBatchStep;
 import io.spring.imagegenerator.batch.step.HostKakaoBatchStep;
@@ -25,6 +29,8 @@ import io.spring.imagegenerator.batch.step.PhotoBatchStep;
 import io.spring.imagegenerator.batch.step.SpaceBatchStep;
 import io.spring.imagegenerator.batch.step.SpaceContentBatchStep;
 import io.spring.imagegenerator.batch.step.SpaceHostMapBatchStep;
+import io.spring.imagegenerator.batch.writer.JsonDataWriter;
+import io.spring.imagegenerator.dto.JsonSpaceData;
 import io.spring.imagegenerator.entity.Guest;
 import io.spring.imagegenerator.entity.Host;
 import io.spring.imagegenerator.entity.HostKakao;
@@ -59,6 +65,15 @@ public class BatchConfiguration {
 
     @Autowired
     private PhotoBatchStep photoBatchStep;
+
+    @Autowired
+    private JsonSpaceProcessor jsonSpaceProcessor;
+
+    @Autowired
+    private JsonDataWriter jsonDataWriter;
+    
+    @Value("${json.file.path}")
+    private String jsonFilePath;
 
     // JdbcBatchItemWriter Beans with Progress Reporting
     @Bean
@@ -227,6 +242,20 @@ public class BatchConfiguration {
     }
 
     @Bean
+    public Job jsonImportJob(JobRepository jobRepository, Step jsonProcessingStep) {
+        return new JobBuilder("jsonImportJob", jobRepository)
+                .start(jsonProcessingStep)
+                .build();
+    }
+
+    @Bean
+    public JsonSpaceItemReader jsonSpaceItemReader() {
+        // 재시작 시 스킵 수를 동적으로 결정하는 로직이 필요하지만
+        // 지금은 기본값 0으로 설정
+        return new JsonSpaceItemReader(jsonFilePath, 0);
+    }
+
+    @Bean
     public Step spaceStep(JobRepository jobRepository, PlatformTransactionManager transactionManager, 
                          ItemWriter<Space> spaceWriter) {
         return new StepBuilder("spaceStep", jobRepository)
@@ -300,6 +329,16 @@ public class BatchConfiguration {
                 .reader(photoBatchStep.reader())
                 .processor(photoBatchStep.processor())
                 .writer(photoWriter)
+                .build();
+    }
+
+    @Bean
+    public Step jsonProcessingStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
+        return new StepBuilder("jsonProcessingStep", jobRepository)
+                .<JsonSpaceData.SpaceData, JsonProcessedData>chunk(100, transactionManager)
+                .reader(jsonSpaceItemReader())
+                .processor(jsonSpaceProcessor)
+                .writer(jsonDataWriter)
                 .build();
     }
 
