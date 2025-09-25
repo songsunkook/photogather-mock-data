@@ -7,8 +7,11 @@ import org.springframework.batch.core.Step;
 import org.springframework.batch.core.StepExecution;
 import org.springframework.batch.core.annotation.BeforeStep;
 import org.springframework.batch.core.job.builder.JobBuilder;
+import org.springframework.batch.core.job.flow.Flow;
+import org.springframework.batch.core.job.flow.support.SimpleFlow;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.batch.item.Chunk;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.database.JdbcBatchItemWriter;
@@ -29,6 +32,8 @@ import io.spring.imagegenerator.batch.step.PhotoBatchStep;
 import io.spring.imagegenerator.batch.step.SpaceBatchStep;
 import io.spring.imagegenerator.batch.step.SpaceContentBatchStep;
 import io.spring.imagegenerator.batch.step.SpaceHostMapBatchStep;
+import io.spring.imagegenerator.batch.step.CyclicBatchStep;
+import io.spring.imagegenerator.batch.step.CyclicTableStep;
 import io.spring.imagegenerator.batch.writer.JsonDataWriter;
 import io.spring.imagegenerator.dto.JsonSpaceData;
 import io.spring.imagegenerator.entity.Guest;
@@ -71,6 +76,12 @@ public class BatchConfiguration {
 
     @Autowired
     private JsonDataWriter jsonDataWriter;
+    
+    @Autowired
+    private CyclicBatchStep cyclicBatchStep;
+    
+    @Autowired 
+    private CyclicTableStep cyclicTableStep;
     
     @Value("${json.file.path}")
     private String jsonFilePath;
@@ -242,6 +253,23 @@ public class BatchConfiguration {
     }
 
     @Bean
+    public Job csvCyclicImportJob(JobRepository jobRepository, 
+                                 Step cyclicSpacesStep, Step cyclicHostsStep, 
+                                 Step cyclicSpaceHostMapsStep, Step cyclicHostKakaosStep,
+                                 Step cyclicGuestsStep, Step cyclicSpaceContentsStep, 
+                                 Step cyclicPhotosStep) {
+        return new JobBuilder("csvCyclicImportJob", jobRepository)
+                .start(cyclicSpacesStep)
+                .next(cyclicHostsStep)
+                .next(cyclicSpaceHostMapsStep) 
+                .next(cyclicHostKakaosStep)
+                .next(cyclicGuestsStep)
+                .next(cyclicSpaceContentsStep)
+                .next(cyclicPhotosStep)
+                .build();
+    }
+
+    @Bean
     public Job jsonImportJob(JobRepository jobRepository, Step jsonProcessingStep) {
         return new JobBuilder("jsonImportJob", jobRepository)
                 .start(jsonProcessingStep)
@@ -338,6 +366,62 @@ public class BatchConfiguration {
                 .reader(jsonSpaceItemReader())
                 .processor(jsonSpaceProcessor)
                 .writer(jsonDataWriter)
+                .build();
+    }
+
+    @Bean
+    public Step cyclicStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
+        return new StepBuilder("cyclicStep", jobRepository)
+                .tasklet(cyclicBatchStep, transactionManager)
+                .build();
+    }
+
+    @Bean
+    public Step cyclicSpacesStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
+        return new StepBuilder("cyclicSpacesStep", jobRepository)
+                .tasklet(new CyclicTableStep.SpacesStep(cyclicTableStep), transactionManager)
+                .build();
+    }
+
+    @Bean
+    public Step cyclicHostsStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
+        return new StepBuilder("cyclicHostsStep", jobRepository)
+                .tasklet(new CyclicTableStep.HostsStep(cyclicTableStep), transactionManager)
+                .build();
+    }
+
+    @Bean
+    public Step cyclicSpaceHostMapsStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
+        return new StepBuilder("cyclicSpaceHostMapsStep", jobRepository)
+                .tasklet(new CyclicTableStep.SpaceHostMapsStep(cyclicTableStep), transactionManager)
+                .build();
+    }
+
+    @Bean
+    public Step cyclicHostKakaosStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
+        return new StepBuilder("cyclicHostKakaosStep", jobRepository)
+                .tasklet(new CyclicTableStep.HostKakaosStep(cyclicTableStep), transactionManager)
+                .build();
+    }
+
+    @Bean
+    public Step cyclicGuestsStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
+        return new StepBuilder("cyclicGuestsStep", jobRepository)
+                .tasklet(new CyclicTableStep.GuestsStep(cyclicTableStep), transactionManager)
+                .build();
+    }
+
+    @Bean
+    public Step cyclicSpaceContentsStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
+        return new StepBuilder("cyclicSpaceContentsStep", jobRepository)
+                .tasklet(new CyclicTableStep.SpaceContentsStep(cyclicTableStep), transactionManager)
+                .build();
+    }
+
+    @Bean
+    public Step cyclicPhotosStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
+        return new StepBuilder("cyclicPhotosStep", jobRepository)
+                .tasklet(new CyclicTableStep.PhotosStep(cyclicTableStep), transactionManager)
                 .build();
     }
 

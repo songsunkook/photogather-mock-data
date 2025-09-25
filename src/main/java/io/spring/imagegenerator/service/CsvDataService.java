@@ -8,6 +8,7 @@ import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobInstance;
 import org.springframework.batch.core.JobParameters;
+import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.StepExecution;
 import org.springframework.batch.core.explore.JobExplorer;
 import org.springframework.batch.core.launch.JobLauncher;
@@ -24,6 +25,9 @@ public class CsvDataService {
 
     @Autowired
     private Job csvImportJob;
+    
+    @Autowired
+    private Job csvCyclicImportJob;
 
     @Autowired
     private JobExplorer jobExplorer;
@@ -32,65 +36,95 @@ public class CsvDataService {
     private JobRepository jobRepository;
 
     public void executeDataImport() {
+        executeCyclicDataImport();
+    }
+    
+    public void executeCyclicDataImport() {
         try {
-/*
-            JobParameters jobParameters = new JobParametersBuilder()
-                .addLong("time", System.currentTimeMillis())
-                .toJobParameters();
-*/
-            JobParameters jobParameters = new JobParameters();
+            // Import CyclicTableStep to access completion methods
+            Class<?> cyclicTableStepClass = Class.forName("io.spring.imagegenerator.batch.step.CyclicTableStep");
+            java.lang.reflect.Method isAllDataProcessedMethod = cyclicTableStepClass.getMethod("isAllDataProcessed");
+            java.lang.reflect.Method printProgressStatusMethod = cyclicTableStepClass.getMethod("printProgressStatus");
             
-            // 기존에 실행중이거나 완료되지 않은 Job이 있는지 확인
-            List<JobInstance> jobInstances = jobExplorer.getJobInstances(csvImportJob.getName(), 0, 1);
+            int cycleCount = 1;
             
-            if (!jobInstances.isEmpty()) {
-                JobInstance jobInstance = jobInstances.get(0);
-                List<JobExecution> jobExecutions = jobExplorer.getJobExecutions(jobInstance);
+            while (true) {
+                System.out.printf("%n=== Cycle %d ===%n", cycleCount);
                 
-                for (JobExecution execution : jobExecutions) {
-                    if (execution.getStatus() == BatchStatus.STARTED || 
-                        execution.getStatus() == BatchStatus.STARTING || 
-                        execution.getStatus() == BatchStatus.STOPPING) {
-                        
-                        System.out.println("Found running job execution: " + execution.getId() + " with status: " + execution.getStatus());
-                        System.out.println("Stopping the running job execution...");
-                        
-                        // 실행중인 Job과 Step을 강제로 FAILED 상태로 변경
-                        execution.setStatus(BatchStatus.FAILED);
-                        execution.setEndTime(LocalDateTime.now());
-                        
-                        // 실행중인 Step들도 FAILED로 변경
-                        for (StepExecution stepExecution : execution.getStepExecutions()) {
-                            if (stepExecution.getStatus() == BatchStatus.STARTED || 
-                                stepExecution.getStatus() == BatchStatus.STARTING ||
-                                stepExecution.getStatus() == BatchStatus.STOPPING) {
-                                stepExecution.setStatus(BatchStatus.FAILED);
-                                stepExecution.setEndTime(LocalDateTime.now());
-                                jobRepository.update(stepExecution);
-                            }
-                        }
-                        
-                        jobRepository.update(execution);
-                        System.out.println("Previous job execution and steps marked as FAILED. Ready for restart.");
-                    }
+                // Check if all data has been processed before starting a new cycle
+                boolean allProcessed = (Boolean) isAllDataProcessedMethod.invoke(null);
+                if (allProcessed) {
+                    System.out.println("All CSV data processed successfully.");
+                    printProgressStatusMethod.invoke(null);
+                    break;
+                }
+                
+                long cycleStartTime = System.currentTimeMillis();
+                
+                // Create unique JobParameters for each cycle to allow restart
+                JobParameters jobParameters = new JobParametersBuilder()
+                    .addLong("cycleNumber", (long) cycleCount)
+                    .addLong("timestamp", System.currentTimeMillis())
+                    .toJobParameters();
+                
+                // 기존에 실행중이거나 완료되지 않은 Job이 있는지 확인
+                List<JobInstance> jobInstances = jobExplorer.getJobInstances(csvCyclicImportJob.getName(), 0, 1);
+                
+                if (!jobInstances.isEmpty()) {
+                    JobInstance jobInstance = jobInstances.get(0);
+                    List<JobExecution> jobExecutions = jobExplorer.getJobExecutions(jobInstance);
                     
-                    if (execution.getStatus() == BatchStatus.FAILED) {
-                        System.out.println("Found failed job execution. Attempting restart...");
-                        break;
+                    for (JobExecution execution : jobExecutions) {
+                        if (execution.getStatus() == BatchStatus.STARTED || 
+                            execution.getStatus() == BatchStatus.STARTING || 
+                            execution.getStatus() == BatchStatus.STOPPING) {
+                            
+                            // 실행중인 Job과 Step을 강제로 FAILED 상태로 변경
+                            execution.setStatus(BatchStatus.FAILED);
+                            execution.setEndTime(LocalDateTime.now());
+                            
+                            // 실행중인 Step들도 FAILED로 변경
+                            for (StepExecution stepExecution : execution.getStepExecutions()) {
+                                if (stepExecution.getStatus() == BatchStatus.STARTED || 
+                                    stepExecution.getStatus() == BatchStatus.STARTING ||
+                                    stepExecution.getStatus() == BatchStatus.STOPPING) {
+                                    stepExecution.setStatus(BatchStatus.FAILED);
+                                    stepExecution.setEndTime(LocalDateTime.now());
+                                    jobRepository.update(stepExecution);
+                                }
+                            }
+                            
+                            jobRepository.update(execution);
+                        }
                     }
                 }
-            }
 
-            System.out.println("Starting CSV import batch job...");
-            JobExecution jobExecution = jobLauncher.run(csvImportJob, jobParameters);
-            System.out.println("CSV import batch job completed with status: " + jobExecution.getExitStatus());
+                JobExecution jobExecution = jobLauncher.run(csvCyclicImportJob, jobParameters);
+                
+                long cycleEndTime = System.currentTimeMillis();
+                long cycleDuration = cycleEndTime - cycleStartTime;
+                
+                System.out.printf("Cycle %d completed (%dms)%n", cycleCount, cycleDuration);
+                
+                // Print progress after each cycle
+                printProgressStatusMethod.invoke(null);
+                
+                // Check completion again after this cycle
+                allProcessed = (Boolean) isAllDataProcessedMethod.invoke(null);
+                if (allProcessed) {
+                    System.out.println("All CSV data processed successfully.");
+                    break;
+                }
+                
+                cycleCount++;
+                
+                // Add a small delay between cycles to avoid overwhelming the system
+                Thread.sleep(1000);
+            }
             
         } catch (JobExecutionAlreadyRunningException e) {
-            System.err.println("Job is already running. This should have been handled above.");
             throw new RuntimeException("Job execution conflict", e);
         } catch (Exception e) {
-            System.err.println("Failed to execute CSV import batch job: " + e.getMessage());
-            e.printStackTrace();
             throw new RuntimeException("Batch job execution failed", e);
         }
     }
