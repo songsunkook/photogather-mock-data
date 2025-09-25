@@ -1,18 +1,7 @@
 package io.spring.imagegenerator.service;
 
-import java.io.FileReader;
-import java.io.IOException;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
 import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvException;
-
 import io.spring.imagegenerator.entity.Guest;
 import io.spring.imagegenerator.entity.Host;
 import io.spring.imagegenerator.entity.HostKakao;
@@ -20,323 +9,292 @@ import io.spring.imagegenerator.entity.Photo;
 import io.spring.imagegenerator.entity.Space;
 import io.spring.imagegenerator.entity.SpaceContent;
 import io.spring.imagegenerator.entity.SpaceHostMap;
+import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+import org.springframework.stereotype.Service;
 
 @Service
 public class CsvDataService {
 
-    @Autowired
-    private JdbcBulkInsertService jdbcBulkInsertService;
-
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    public void loadSpacesFromCsv(String filePath) {
-        try (CSVReader reader = new CSVReader(new FileReader(filePath))) {
-            String[] headerRow = reader.readNext(); // Skip header
-            if (headerRow == null) return;
-            
-            List<Space> spaces = new ArrayList<>();
+    private boolean isNullOrEmpty(String str) {
+        return str == null || str.trim().isEmpty();
+    }
+
+    public List<Space> loadSpacesFromCsv(CSVReader reader, int limit) {
+        List<Space> spaces = new ArrayList<>();
+        try {
             String[] record;
-            int recordCount = 0;
-            int batchCount = 0;
-            
-            while ((record = reader.readNext()) != null) {
-                recordCount++;
-                
+            while ((record = reader.readNext()) != null && spaces.size() < limit) {
                 Space space = new Space(
-                    record[1], // code
-                    record[2].replace("\"", ""), // name
-                    Integer.parseInt(record[3]), // valid_hours
-                    LocalDateTime.parse(record[4], FORMATTER), // opened_at
-                    Long.parseLong(record[5]), // max_capacity
-                    Space.SpaceType.valueOf(record[6]), // type
-                    LocalDateTime.parse(record[7], FORMATTER), // created_at
-                    LocalDateTime.parse(record[8], FORMATTER) // updated_at
+                    record[0],
+                    record[1].replace("\"", ""),
+                    Integer.parseInt(record[2]),
+                    LocalDateTime.parse(record[3], FORMATTER),
+                    Long.parseLong(record[4]),
+                    Space.SpaceType.valueOf(record[5]),
+                    LocalDateTime.parse(record[6], FORMATTER),
+                    LocalDateTime.parse(record[7], FORMATTER)
                 );
-                space.setId(Long.parseLong(record[0]));
                 spaces.add(space);
-                
-                // Process in batches of 10000 to manage memory
-                if (spaces.size() >= 10000) {
-                    batchCount++;
-                    System.out.printf("  Spaces: Processing batch %d (records: %d)\n", batchCount, recordCount);
-                    jdbcBulkInsertService.bulkInsertSpaces(spaces);
-                    spaces.clear();
-                }
             }
-            
-            // Process remaining records
-            if (!spaces.isEmpty()) {
-                batchCount++;
-                System.out.printf("  Spaces: Processing final batch %d (records: %d)\n", batchCount, recordCount);
-                jdbcBulkInsertService.bulkInsertSpaces(spaces);
-            }
-            
-            System.out.printf("  Spaces: %d records processed (100%%)\n", recordCount);
         } catch (IOException | CsvException e) {
             throw new RuntimeException("Failed to load spaces from CSV", e);
         }
+        return spaces;
     }
 
-    public void loadHostsFromCsv(String filePath) {
-        try (CSVReader reader = new CSVReader(new FileReader(filePath))) {
-            String[] headerRow = reader.readNext(); // Skip header
-            if (headerRow == null) return;
-            
-            List<Host> hosts = new ArrayList<>();
+    public List<Host> loadHostsFromCsv(CSVReader reader, int limit) {
+        List<Host> hosts = new ArrayList<>();
+        try {
             String[] record;
-            int recordCount = 0;
-            int batchCount = 0;
-            
-            while ((record = reader.readNext()) != null) {
-                recordCount++;
-                
+            while ((record = reader.readNext()) != null && hosts.size() < limit) {
                 Host host = new Host(
-                    record[1].replace("\"", ""), // name
-                    record[2], // picture_url
-                    Boolean.parseBoolean(record[3]), // agreed_terms
-                    LocalDateTime.parse(record[4], FORMATTER), // created_at
-                    LocalDateTime.parse(record[5], FORMATTER) // updated_at
+                    isNullOrEmpty(record[0]) ? null : record[0].replace("\"", ""),
+                    isNullOrEmpty(record[1]) ? null : record[1],
+                    Boolean.parseBoolean(record[2]),
+                    LocalDateTime.parse(record[3], FORMATTER),
+                    LocalDateTime.parse(record[4], FORMATTER)
                 );
-                host.setId(Long.parseLong(record[0]));
                 hosts.add(host);
-                
-                // Process in batches of 10000 to manage memory
-                if (hosts.size() >= 10000) {
-                    batchCount++;
-                    System.out.printf("  Hosts: Processing batch %d (records: %d)\n", batchCount, recordCount);
-                    jdbcBulkInsertService.bulkInsertHosts(hosts);
-                    hosts.clear();
-                }
             }
-            
-            // Process remaining records
-            if (!hosts.isEmpty()) {
-                batchCount++;
-                System.out.printf("  Hosts: Processing final batch %d (records: %d)\n", batchCount, recordCount);
-                jdbcBulkInsertService.bulkInsertHosts(hosts);
-            }
-            
-            System.out.printf("  Hosts: %d records processed (100%%)\n", recordCount);
         } catch (IOException | CsvException e) {
             throw new RuntimeException("Failed to load hosts from CSV", e);
         }
+        return hosts;
     }
 
-    public void loadSpaceHostMapsFromCsv(String filePath) {
-        try (CSVReader reader = new CSVReader(new FileReader(filePath))) {
-            String[] headerRow = reader.readNext(); // Skip header
-            if (headerRow == null) return;
-            
-            List<SpaceHostMap> spaceHostMaps = new ArrayList<>();
+    public List<SpaceHostMap> loadSpaceHostMapsFromCsv(CSVReader reader, int limit) {
+        List<SpaceHostMap> spaceHostMaps = new ArrayList<>();
+        try {
             String[] record;
-            int recordCount = 0;
-            int batchCount = 0;
-            
-            while ((record = reader.readNext()) != null) {
-                recordCount++;
-                
+            while ((record = reader.readNext()) != null && spaceHostMaps.size() < limit) {
                 SpaceHostMap spaceHostMap = new SpaceHostMap(
-                    Long.parseLong(record[1]), // space_id
-                    Long.parseLong(record[2]), // host_id
-                    LocalDateTime.parse(record[3], FORMATTER), // created_at
-                    LocalDateTime.parse(record[4], FORMATTER) // updated_at
+                    Long.parseLong(record[0]),
+                    Long.parseLong(record[1]),
+                    isNullOrEmpty(record[2]) ? null : LocalDateTime.parse(record[2], FORMATTER),
+                    isNullOrEmpty(record[3]) ? null : LocalDateTime.parse(record[3], FORMATTER)
                 );
-                spaceHostMap.setId(Long.parseLong(record[0]));
                 spaceHostMaps.add(spaceHostMap);
-                
-                // Process in batches of 10000 to manage memory
-                if (spaceHostMaps.size() >= 10000) {
-                    batchCount++;
-                    System.out.printf("  SpaceHostMaps: Processing batch %d (records: %d)\n", batchCount, recordCount);
-                    jdbcBulkInsertService.bulkInsertSpaceHostMaps(spaceHostMaps);
-                    spaceHostMaps.clear();
-                }
             }
-            
-            // Process remaining records
-            if (!spaceHostMaps.isEmpty()) {
-                batchCount++;
-                System.out.printf("  SpaceHostMaps: Processing final batch %d (records: %d)\n", batchCount, recordCount);
-                jdbcBulkInsertService.bulkInsertSpaceHostMaps(spaceHostMaps);
-            }
-            
-            System.out.printf("  SpaceHostMaps: %d records processed (100%%)\n", recordCount);
         } catch (IOException | CsvException e) {
             throw new RuntimeException("Failed to load space host maps from CSV", e);
         }
+        return spaceHostMaps;
     }
 
-    public void loadHostKakaosFromCsv(String filePath) {
-        try (CSVReader reader = new CSVReader(new FileReader(filePath))) {
-            String[] headerRow = reader.readNext(); // Skip header
-            if (headerRow == null) return;
-            
-            List<HostKakao> hostKakaos = new ArrayList<>();
+    public List<HostKakao> loadHostKakaosFromCsv(CSVReader reader, int limit) {
+        List<HostKakao> hostKakaos = new ArrayList<>();
+        try {
             String[] record;
-            int recordCount = 0;
-            int batchCount = 0;
-            
-            while ((record = reader.readNext()) != null) {
-                recordCount++;
-                
+            while ((record = reader.readNext()) != null && hostKakaos.size() < limit) {
                 HostKakao hostKakao = new HostKakao(
-                    Long.parseLong(record[1]), // host_id
-                    record[2] // user_id
+                    Long.parseLong(record[0]),
+                    record[1]
                 );
-                hostKakao.setId(Long.parseLong(record[0]));
                 hostKakaos.add(hostKakao);
-                
-                // Process in batches of 10000 to manage memory
-                if (hostKakaos.size() >= 10000) {
-                    batchCount++;
-                    System.out.printf("  HostKakaos: Processing batch %d (records: %d)\n", batchCount, recordCount);
-                    jdbcBulkInsertService.bulkInsertHostKakaos(hostKakaos);
-                    hostKakaos.clear();
-                }
             }
-            
-            // Process remaining records
-            if (!hostKakaos.isEmpty()) {
-                batchCount++;
-                System.out.printf("  HostKakaos: Processing final batch %d (records: %d)\n", batchCount, recordCount);
-                jdbcBulkInsertService.bulkInsertHostKakaos(hostKakaos);
-            }
-            
-            System.out.printf("  HostKakaos: %d records processed (100%%)\n", recordCount);
         } catch (IOException | CsvException e) {
             throw new RuntimeException("Failed to load host kakaos from CSV", e);
         }
+        return hostKakaos;
     }
 
-    public void loadGuestsFromCsv(String filePath) {
-        try (CSVReader reader = new CSVReader(new FileReader(filePath))) {
-            String[] headerRow = reader.readNext(); // Skip header
-            if (headerRow == null) return;
-            
-            List<Guest> guests = new ArrayList<>();
+    public List<Guest> loadGuestsFromCsv(CSVReader reader, int limit) {
+        List<Guest> guests = new ArrayList<>();
+        try {
             String[] record;
-            int recordCount = 0;
-            int batchCount = 0;
-            
-            while ((record = reader.readNext()) != null) {
-                recordCount++;
-                
+            while ((record = reader.readNext()) != null && guests.size() < limit) {
                 Guest guest = new Guest(
-                    Long.parseLong(record[1]), // space_id
-                    record[2].replace("\"", ""), // name
-                    LocalDateTime.parse(record[3], FORMATTER), // created_at
-                    LocalDateTime.parse(record[4], FORMATTER) // updated_at
+                    Long.parseLong(record[0]),
+                    isNullOrEmpty(record[1]) ? null : record[1].replace("\"", ""),
+                    LocalDateTime.parse(record[2], FORMATTER),
+                    LocalDateTime.parse(record[3], FORMATTER)
                 );
-                guest.setId(Long.parseLong(record[0]));
                 guests.add(guest);
-                
-                // Process in batches of 10000 to manage memory
-                if (guests.size() >= 10000) {
-                    batchCount++;
-                    System.out.printf("  Guests: Processing batch %d (records: %d)\n", batchCount, recordCount);
-                    jdbcBulkInsertService.bulkInsertGuests(guests);
-                    guests.clear();
-                }
             }
-            
-            // Process remaining records
-            if (!guests.isEmpty()) {
-                batchCount++;
-                System.out.printf("  Guests: Processing final batch %d (records: %d)\n", batchCount, recordCount);
-                jdbcBulkInsertService.bulkInsertGuests(guests);
-            }
-            
-            System.out.printf("  Guests: %d records processed (100%%)\n", recordCount);
         } catch (IOException | CsvException e) {
             throw new RuntimeException("Failed to load guests from CSV", e);
         }
+        return guests;
     }
 
-    public void loadSpaceContentsFromCsv(String filePath) {
-        try (CSVReader reader = new CSVReader(new FileReader(filePath))) {
-            String[] headerRow = reader.readNext(); // Skip header
-            if (headerRow == null) return;
-            
-            List<SpaceContent> spaceContents = new ArrayList<>();
+    public List<SpaceContent> loadSpaceContentsFromCsv(CSVReader reader, int limit) {
+        List<SpaceContent> spaceContents = new ArrayList<>();
+        try {
             String[] record;
-            int recordCount = 0;
-            int batchCount = 0;
-            
-            while ((record = reader.readNext()) != null) {
-                recordCount++;
-                
+            while ((record = reader.readNext()) != null && spaceContents.size() < limit) {
                 SpaceContent spaceContent = new SpaceContent(
-                    SpaceContent.ContentType.valueOf(record[1]), // content_type
-                    Long.parseLong(record[2]), // space_id
-                    Long.parseLong(record[3]) // guest_id
+                    SpaceContent.ContentType.valueOf(record[0]),
+                    Long.parseLong(record[1]),
+                    isNullOrEmpty(record[2]) ? null : Long.parseLong(record[2])
                 );
-                spaceContent.setId(Long.parseLong(record[0]));
                 spaceContents.add(spaceContent);
-                
-                // Process in batches of 10000 to manage memory
-                if (spaceContents.size() >= 10000) {
-                    batchCount++;
-                    System.out.printf("  SpaceContents: Processing batch %d (records: %d)\n", batchCount, recordCount);
-                    jdbcBulkInsertService.bulkInsertSpaceContents(spaceContents);
-                    spaceContents.clear();
-                }
             }
-            
-            // Process remaining records
-            if (!spaceContents.isEmpty()) {
-                batchCount++;
-                System.out.printf("  SpaceContents: Processing final batch %d (records: %d)\n", batchCount, recordCount);
-                jdbcBulkInsertService.bulkInsertSpaceContents(spaceContents);
-            }
-            
-            System.out.printf("  SpaceContents: %d records processed (100%%)\n", recordCount);
         } catch (IOException | CsvException e) {
             throw new RuntimeException("Failed to load space contents from CSV", e);
         }
+        return spaceContents;
     }
 
-    public void loadPhotosFromCsv(String filePath) {
-        try (CSVReader reader = new CSVReader(new FileReader(filePath))) {
-            String[] headerRow = reader.readNext(); // Skip header
-            if (headerRow == null) return;
-            
-            List<Photo> photos = new ArrayList<>();
+    public List<Photo> loadPhotosFromCsv(CSVReader reader, int limit) {
+        List<Photo> photos = new ArrayList<>();
+        try {
             String[] record;
-            int recordCount = 0;
-            int batchCount = 0;
-            
-            while ((record = reader.readNext()) != null) {
-                recordCount++;
-                
+            while ((record = reader.readNext()) != null && photos.size() < limit) {
                 Photo photo = new Photo(
-                    record[1].replace("\"", ""), // original_name
-                    record[2].replace("\"", ""), // path
-                    LocalDateTime.parse(record[3], FORMATTER), // captured_at
-                    Long.parseLong(record[4]), // capacity
-                    LocalDateTime.parse(record[5], FORMATTER) // created_at
+                    record[0].replace("\"", ""),
+                    record[1].replace("\"", ""),
+                    isNullOrEmpty(record[2]) ? null : LocalDateTime.parse(record[2], FORMATTER),
+                    Long.parseLong(record[3]),
+                    LocalDateTime.parse(record[4], FORMATTER)
                 );
-                photo.setId(Long.parseLong(record[0]));
                 photos.add(photo);
-                
-                // Process in batches of 10000 to manage memory
-                if (photos.size() >= 10000) {
-                    batchCount++;
-                    System.out.printf("  Photos: Processing batch %d (records: %d)\n", batchCount, recordCount);
-                    jdbcBulkInsertService.bulkInsertPhotos(photos);
-                    photos.clear();
-                }
             }
-            
-            // Process remaining records
-            if (!photos.isEmpty()) {
-                batchCount++;
-                System.out.printf("  Photos: Processing final batch %d (records: %d)\n", batchCount, recordCount);
-                jdbcBulkInsertService.bulkInsertPhotos(photos);
-            }
-            
-            System.out.printf("  Photos: %d records processed (100%%)\n", recordCount);
         } catch (IOException | CsvException e) {
             throw new RuntimeException("Failed to load photos from CSV", e);
         }
+        return photos;
+    }
+
+    // Methods to load all data without limit
+    public List<Space> loadAllSpacesFromCsv(CSVReader reader) {
+        List<Space> spaces = new ArrayList<>();
+        try {
+            String[] record;
+            while ((record = reader.readNext()) != null) {
+                Space space = new Space(
+                    record[0],
+                    record[1].replace("\"", ""),
+                    Integer.parseInt(record[2]),
+                    LocalDateTime.parse(record[3], FORMATTER),
+                    Long.parseLong(record[4]),
+                    Space.SpaceType.valueOf(record[5]),
+                    LocalDateTime.parse(record[6], FORMATTER),
+                    LocalDateTime.parse(record[7], FORMATTER)
+                );
+                spaces.add(space);
+            }
+        } catch (IOException | CsvException e) {
+            throw new RuntimeException("Failed to load all spaces from CSV", e);
+        }
+        return spaces;
+    }
+
+    public List<Host> loadAllHostsFromCsv(CSVReader reader) {
+        List<Host> hosts = new ArrayList<>();
+        try {
+            String[] record;
+            while ((record = reader.readNext()) != null) {
+                Host host = new Host(
+                    isNullOrEmpty(record[0]) ? null : record[0].replace("\"", ""),
+                    isNullOrEmpty(record[1]) ? null : record[1],
+                    Boolean.parseBoolean(record[2]),
+                    LocalDateTime.parse(record[3], FORMATTER),
+                    LocalDateTime.parse(record[4], FORMATTER)
+                );
+                hosts.add(host);
+            }
+        } catch (IOException | CsvException e) {
+            throw new RuntimeException("Failed to load all hosts from CSV", e);
+        }
+        return hosts;
+    }
+
+    public List<SpaceHostMap> loadAllSpaceHostMapsFromCsv(CSVReader reader) {
+        List<SpaceHostMap> spaceHostMaps = new ArrayList<>();
+        try {
+            String[] record;
+            while ((record = reader.readNext()) != null) {
+                SpaceHostMap spaceHostMap = new SpaceHostMap(
+                    Long.parseLong(record[0]),
+                    Long.parseLong(record[1]),
+                    isNullOrEmpty(record[2]) ? null : LocalDateTime.parse(record[2], FORMATTER),
+                    isNullOrEmpty(record[3]) ? null : LocalDateTime.parse(record[3], FORMATTER)
+                );
+                spaceHostMaps.add(spaceHostMap);
+            }
+        } catch (IOException | CsvException e) {
+            throw new RuntimeException("Failed to load all space host maps from CSV", e);
+        }
+        return spaceHostMaps;
+    }
+
+    public List<HostKakao> loadAllHostKakaosFromCsv(CSVReader reader) {
+        List<HostKakao> hostKakaos = new ArrayList<>();
+        try {
+            String[] record;
+            while ((record = reader.readNext()) != null) {
+                HostKakao hostKakao = new HostKakao(
+                    Long.parseLong(record[0]),
+                    record[1]
+                );
+                hostKakaos.add(hostKakao);
+            }
+        } catch (IOException | CsvException e) {
+            throw new RuntimeException("Failed to load all host kakaos from CSV", e);
+        }
+        return hostKakaos;
+    }
+
+    public List<Guest> loadAllGuestsFromCsv(CSVReader reader) {
+        List<Guest> guests = new ArrayList<>();
+        try {
+            String[] record;
+            while ((record = reader.readNext()) != null) {
+                Guest guest = new Guest(
+                    Long.parseLong(record[0]),
+                    isNullOrEmpty(record[1]) ? null : record[1].replace("\"", ""),
+                    LocalDateTime.parse(record[2], FORMATTER),
+                    LocalDateTime.parse(record[3], FORMATTER)
+                );
+                guests.add(guest);
+            }
+        } catch (IOException | CsvException e) {
+            throw new RuntimeException("Failed to load all guests from CSV", e);
+        }
+        return guests;
+    }
+
+    public List<SpaceContent> loadAllSpaceContentsFromCsv(CSVReader reader) {
+        List<SpaceContent> spaceContents = new ArrayList<>();
+        try {
+            String[] record;
+            while ((record = reader.readNext()) != null) {
+                SpaceContent spaceContent = new SpaceContent(
+                    SpaceContent.ContentType.valueOf(record[0]),
+                    Long.parseLong(record[1]),
+                    isNullOrEmpty(record[2]) ? null : Long.parseLong(record[2])
+                );
+                spaceContents.add(spaceContent);
+            }
+        } catch (IOException | CsvException e) {
+            throw new RuntimeException("Failed to load all space contents from CSV", e);
+        }
+        return spaceContents;
+    }
+
+    public List<Photo> loadAllPhotosFromCsv(CSVReader reader) {
+        List<Photo> photos = new ArrayList<>();
+        try {
+            String[] record;
+            while ((record = reader.readNext()) != null) {
+                Photo photo = new Photo(
+                    record[0].replace("\"", ""),
+                    record[1].replace("\"", ""),
+                    isNullOrEmpty(record[2]) ? null : LocalDateTime.parse(record[2], FORMATTER),
+                    Long.parseLong(record[3]),
+                    LocalDateTime.parse(record[4], FORMATTER)
+                );
+                photos.add(photo);
+            }
+        } catch (IOException | CsvException e) {
+            throw new RuntimeException("Failed to load all photos from CSV", e);
+        }
+        return photos;
     }
 }
