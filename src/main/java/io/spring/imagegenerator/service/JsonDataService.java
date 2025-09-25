@@ -2,18 +2,18 @@ package io.spring.imagegenerator.service;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
+import javax.sql.DataSource;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
-import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.Statement;
 
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
@@ -304,6 +304,9 @@ public class JsonDataService {
             
             // 외래키 체크 끄기
             statement.execute("SET foreign_key_checks = 0");
+
+            // Binary logging 끄기
+            statement.execute("SET sql_log_bin = 0");
             
             System.out.println("MySQL optimizations applied successfully.");
             
