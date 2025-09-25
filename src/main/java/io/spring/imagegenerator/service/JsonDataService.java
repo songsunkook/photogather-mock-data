@@ -163,8 +163,10 @@ public class JsonDataService {
         
         // 2. Spaces bulk insert
         long spaceInsertStart = System.currentTimeMillis();
+        System.out.printf("Inserting %d spaces...\n", spaces.size());
         jdbcBulkInsertService.bulkInsertSpaces(spaces);
         long spaceInsertEnd = System.currentTimeMillis();
+        System.out.printf("Spaces inserted successfully in %dms\n", (spaceInsertEnd - spaceInsertStart));
         
         // 3. 관련 데이터 생성 및 저장
         long otherDataStart = System.currentTimeMillis();
@@ -262,6 +264,9 @@ public class JsonDataService {
         }
         long bulkInsertEnd = System.currentTimeMillis();
         
+        // 배치 완료 후 커밋
+        commitBatch();
+        
         long batchEndTime = System.currentTimeMillis();
         long totalBatchTime = batchEndTime - batchStartTime;
         
@@ -330,6 +335,17 @@ public class JsonDataService {
             
         } catch (Exception e) {
             System.err.println("Failed to restore MySQL settings: " + e.getMessage());
+        }
+    }
+    
+    private void commitBatch() {
+        try (Connection connection = dataSource.getConnection();
+             Statement statement = connection.createStatement()) {
+            
+            statement.execute("COMMIT");
+            
+        } catch (Exception e) {
+            System.err.println("Failed to commit batch: " + e.getMessage());
         }
     }
 }
