@@ -328,29 +328,27 @@ public class CyclicTableStep {
             }
 
             if (!spaces.isEmpty()) {
-                jdbcTemplate.batchUpdate(
-                    "INSERT INTO space (id, code, name, valid_hours, opened_at, max_capacity, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    new BatchPreparedStatementSetter() {
-                        @Override
-                        public void setValues(PreparedStatement ps, int i) throws SQLException {
-                            Space space = spaces.get(i);
-                            ps.setLong(1, space.getId());
-                            ps.setString(2, space.getCode());
-                            ps.setString(3, space.getName());
-                            ps.setInt(4, space.getValidHours());
-                            ps.setTimestamp(5, Timestamp.valueOf(space.getOpenedAt()));
-                            ps.setLong(6, space.getMaxCapacity());
-                            ps.setString(7, space.getType().name());
-                            ps.setTimestamp(8, Timestamp.valueOf(space.getCreatedAt()));
-                            ps.setTimestamp(9, Timestamp.valueOf(space.getUpdatedAt()));
-                        }
+                // Use proper bulk insert with single SQL statement
+                StringBuilder sql = new StringBuilder("INSERT INTO space (id, code, name, valid_hours, opened_at, max_capacity, type, created_at, updated_at) VALUES ");
+                List<Object> params = new ArrayList<>();
 
-                        @Override
-                        public int getBatchSize() {
-                            return spaces.size();
-                        }
-                    }
-                );
+                for (int i = 0; i < spaces.size(); i++) {
+                    if (i > 0) sql.append(", ");
+                    sql.append("(?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+                    Space space = spaces.get(i);
+                    params.add(space.getId());
+                    params.add(space.getCode());
+                    params.add(space.getName());
+                    params.add(space.getValidHours());
+                    params.add(Timestamp.valueOf(space.getOpenedAt()));
+                    params.add(space.getMaxCapacity());
+                    params.add(space.getType().name());
+                    params.add(Timestamp.valueOf(space.getCreatedAt()));
+                    params.add(Timestamp.valueOf(space.getUpdatedAt()));
+                }
+
+                jdbcTemplate.update(sql.toString(), params.toArray());
                 spaceIdCounter = idCounter;
                 long executionTime = System.currentTimeMillis() - startTime;
                 System.out.printf("Spaces Step: %d records (%dms)%n", count, executionTime);
@@ -393,26 +391,24 @@ public class CyclicTableStep {
             }
 
             if (!hosts.isEmpty()) {
-                jdbcTemplate.batchUpdate(
-                    "INSERT INTO host (id, name, picture_url, agreed_terms, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-                    new BatchPreparedStatementSetter() {
-                        @Override
-                        public void setValues(PreparedStatement ps, int i) throws SQLException {
-                            Host host = hosts.get(i);
-                            ps.setLong(1, host.getId());
-                            ps.setString(2, host.getName());
-                            ps.setString(3, host.getPictureUrl());
-                            ps.setBoolean(4, host.getAgreedTerms());
-                            ps.setTimestamp(5, Timestamp.valueOf(host.getCreatedAt()));
-                            ps.setTimestamp(6, Timestamp.valueOf(host.getUpdatedAt()));
-                        }
+                // Use proper bulk insert with single SQL statement
+                StringBuilder sql = new StringBuilder("INSERT INTO host (id, name, picture_url, agreed_terms, created_at, updated_at) VALUES ");
+                List<Object> params = new ArrayList<>();
 
-                        @Override
-                        public int getBatchSize() {
-                            return hosts.size();
-                        }
-                    }
-                );
+                for (int i = 0; i < hosts.size(); i++) {
+                    if (i > 0) sql.append(", ");
+                    sql.append("(?, ?, ?, ?, ?, ?)");
+
+                    Host host = hosts.get(i);
+                    params.add(host.getId());
+                    params.add(host.getName());
+                    params.add(host.getPictureUrl());
+                    params.add(host.getAgreedTerms());
+                    params.add(Timestamp.valueOf(host.getCreatedAt()));
+                    params.add(Timestamp.valueOf(host.getUpdatedAt()));
+                }
+
+                jdbcTemplate.update(sql.toString(), params.toArray());
                 hostIdCounter = idCounter;
                 long executionTime = System.currentTimeMillis() - startTime;
                 System.out.printf("Hosts Step: %d records (%dms)%n", count, executionTime);
@@ -453,25 +449,23 @@ public class CyclicTableStep {
             }
 
             if (!spaceHostMaps.isEmpty()) {
-                jdbcTemplate.batchUpdate(
-                    "INSERT INTO space_host_map (id, space_id, host_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-                    new BatchPreparedStatementSetter() {
-                        @Override
-                        public void setValues(PreparedStatement ps, int i) throws SQLException {
-                            SpaceHostMap spaceHostMap = spaceHostMaps.get(i);
-                            ps.setLong(1, spaceHostMap.getId());
-                            ps.setLong(2, spaceHostMap.getSpaceId());
-                            ps.setLong(3, spaceHostMap.getHostId());
-                            ps.setTimestamp(4, Timestamp.valueOf(spaceHostMap.getCreatedAt()));
-                            ps.setTimestamp(5, Timestamp.valueOf(spaceHostMap.getUpdatedAt()));
-                        }
+                // Use proper bulk insert with single SQL statement
+                StringBuilder sql = new StringBuilder("INSERT INTO space_host_map (id, space_id, host_id, created_at, updated_at) VALUES ");
+                List<Object> params = new ArrayList<>();
 
-                        @Override
-                        public int getBatchSize() {
-                            return spaceHostMaps.size();
-                        }
-                    }
-                );
+                for (int i = 0; i < spaceHostMaps.size(); i++) {
+                    if (i > 0) sql.append(", ");
+                    sql.append("(?, ?, ?, ?, ?)");
+
+                    SpaceHostMap spaceHostMap = spaceHostMaps.get(i);
+                    params.add(spaceHostMap.getId());
+                    params.add(spaceHostMap.getSpaceId());
+                    params.add(spaceHostMap.getHostId());
+                    params.add(Timestamp.valueOf(spaceHostMap.getCreatedAt()));
+                    params.add(Timestamp.valueOf(spaceHostMap.getUpdatedAt()));
+                }
+
+                jdbcTemplate.update(sql.toString(), params.toArray());
                 spaceHostMapIdCounter = idCounter;
                 long executionTime = System.currentTimeMillis() - startTime;
                 System.out.printf("SpaceHostMaps Step: %d records (%dms)%n", count, executionTime);
@@ -510,23 +504,21 @@ public class CyclicTableStep {
             }
 
             if (!hostKakaos.isEmpty()) {
-                jdbcTemplate.batchUpdate(
-                    "INSERT INTO host_kakao (id, host_id, user_id) VALUES (?, ?, ?)",
-                    new BatchPreparedStatementSetter() {
-                        @Override
-                        public void setValues(PreparedStatement ps, int i) throws SQLException {
-                            HostKakao hostKakao = hostKakaos.get(i);
-                            ps.setLong(1, hostKakao.getId());
-                            ps.setLong(2, hostKakao.getHostId());
-                            ps.setString(3, hostKakao.getUserId());
-                        }
+                // Use proper bulk insert with single SQL statement
+                StringBuilder sql = new StringBuilder("INSERT INTO host_kakao (id, host_id, user_id) VALUES ");
+                List<Object> params = new ArrayList<>();
 
-                        @Override
-                        public int getBatchSize() {
-                            return hostKakaos.size();
-                        }
-                    }
-                );
+                for (int i = 0; i < hostKakaos.size(); i++) {
+                    if (i > 0) sql.append(", ");
+                    sql.append("(?, ?, ?)");
+
+                    HostKakao hostKakao = hostKakaos.get(i);
+                    params.add(hostKakao.getId());
+                    params.add(hostKakao.getHostId());
+                    params.add(hostKakao.getUserId());
+                }
+
+                jdbcTemplate.update(sql.toString(), params.toArray());
                 hostKakaoIdCounter = idCounter;
                 long executionTime = System.currentTimeMillis() - startTime;
                 System.out.printf("HostKakaos Step: %d records (%dms)%n", count, executionTime);
@@ -567,25 +559,23 @@ public class CyclicTableStep {
             }
 
             if (!guests.isEmpty()) {
-                jdbcTemplate.batchUpdate(
-                    "INSERT INTO guest (id, space_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-                    new BatchPreparedStatementSetter() {
-                        @Override
-                        public void setValues(PreparedStatement ps, int i) throws SQLException {
-                            Guest guest = guests.get(i);
-                            ps.setLong(1, guest.getId());
-                            ps.setLong(2, guest.getSpaceId());
-                            ps.setString(3, guest.getName());
-                            ps.setTimestamp(4, Timestamp.valueOf(guest.getCreatedAt()));
-                            ps.setTimestamp(5, Timestamp.valueOf(guest.getUpdatedAt()));
-                        }
+                // Use proper bulk insert with single SQL statement
+                StringBuilder sql = new StringBuilder("INSERT INTO guest (id, space_id, name, created_at, updated_at) VALUES ");
+                List<Object> params = new ArrayList<>();
 
-                        @Override
-                        public int getBatchSize() {
-                            return guests.size();
-                        }
-                    }
-                );
+                for (int i = 0; i < guests.size(); i++) {
+                    if (i > 0) sql.append(", ");
+                    sql.append("(?, ?, ?, ?, ?)");
+
+                    Guest guest = guests.get(i);
+                    params.add(guest.getId());
+                    params.add(guest.getSpaceId());
+                    params.add(guest.getName());
+                    params.add(Timestamp.valueOf(guest.getCreatedAt()));
+                    params.add(Timestamp.valueOf(guest.getUpdatedAt()));
+                }
+
+                jdbcTemplate.update(sql.toString(), params.toArray());
                 guestIdCounter = idCounter;
                 long executionTime = System.currentTimeMillis() - startTime;
                 System.out.printf("Guests Step: %d records (%dms)%n", count, executionTime);
@@ -625,28 +615,22 @@ public class CyclicTableStep {
             }
 
             if (!spaceContents.isEmpty()) {
-                jdbcTemplate.batchUpdate(
-                    "INSERT INTO space_content (id, content_type, space_id, guest_id) VALUES (?, ?, ?, ?)",
-                    new BatchPreparedStatementSetter() {
-                        @Override
-                        public void setValues(PreparedStatement ps, int i) throws SQLException {
-                            SpaceContent spaceContent = spaceContents.get(i);
-                            ps.setLong(1, spaceContent.getId());
-                            ps.setString(2, spaceContent.getContentType().name());
-                            ps.setLong(3, spaceContent.getSpaceId());
-                            if (spaceContent.getGuestId() != null) {
-                                ps.setLong(4, spaceContent.getGuestId());
-                            } else {
-                                ps.setNull(4, java.sql.Types.BIGINT);
-                            }
-                        }
+                // Use proper bulk insert with single SQL statement
+                StringBuilder sql = new StringBuilder("INSERT INTO space_content (id, content_type, space_id, guest_id) VALUES ");
+                List<Object> params = new ArrayList<>();
 
-                        @Override
-                        public int getBatchSize() {
-                            return spaceContents.size();
-                        }
-                    }
-                );
+                for (int i = 0; i < spaceContents.size(); i++) {
+                    if (i > 0) sql.append(", ");
+                    sql.append("(?, ?, ?, ?)");
+
+                    SpaceContent spaceContent = spaceContents.get(i);
+                    params.add(spaceContent.getId());
+                    params.add(spaceContent.getContentType().name());
+                    params.add(spaceContent.getSpaceId());
+                    params.add(spaceContent.getGuestId());
+                }
+
+                jdbcTemplate.update(sql.toString(), params.toArray());
                 spaceContentIdCounter = idCounter;
                 long executionTime = System.currentTimeMillis() - startTime;
                 System.out.printf("SpaceContents Step: %d records (%dms)%n", count, executionTime);
@@ -694,30 +678,24 @@ public class CyclicTableStep {
             }
 
             if (!photos.isEmpty()) {
-                jdbcTemplate.batchUpdate(
-                    "INSERT INTO photo (id, original_name, path, captured_at, capacity, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                    new BatchPreparedStatementSetter() {
-                        @Override
-                        public void setValues(PreparedStatement ps, int i) throws SQLException {
-                            Photo photo = photos.get(i);
-                            ps.setLong(1, photo.getId());
-                            ps.setString(2, photo.getOriginalName());
-                            ps.setString(3, photo.getPath());
-                            if (photo.getCapturedAt() != null) {
-                                ps.setTimestamp(4, Timestamp.valueOf(photo.getCapturedAt()));
-                            } else {
-                                ps.setNull(4, java.sql.Types.TIMESTAMP);
-                            }
-                            ps.setLong(5, photo.getCapacity());
-                            ps.setTimestamp(6, Timestamp.valueOf(photo.getCreatedAt()));
-                        }
+                // Use proper bulk insert with single SQL statement
+                StringBuilder sql = new StringBuilder("INSERT INTO photo (id, original_name, path, captured_at, capacity, created_at) VALUES ");
+                List<Object> params = new ArrayList<>();
 
-                        @Override
-                        public int getBatchSize() {
-                            return photos.size();
-                        }
-                    }
-                );
+                for (int i = 0; i < photos.size(); i++) {
+                    if (i > 0) sql.append(", ");
+                    sql.append("(?, ?, ?, ?, ?, ?)");
+
+                    Photo photo = photos.get(i);
+                    params.add(photo.getId());
+                    params.add(photo.getOriginalName());
+                    params.add(photo.getPath());
+                    params.add(photo.getCapturedAt() != null ? Timestamp.valueOf(photo.getCapturedAt()) : null);
+                    params.add(photo.getCapacity());
+                    params.add(Timestamp.valueOf(photo.getCreatedAt()));
+                }
+
+                jdbcTemplate.update(sql.toString(), params.toArray());
                 photoIdCounter = idCounter;
                 long executionTime = System.currentTimeMillis() - startTime;
                 System.out.printf("Photos Step: %d records (%dms)%n", count, executionTime);
