@@ -11,6 +11,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.Statement;
+
 
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
@@ -59,6 +63,9 @@ public class JsonDataService {
     
     @Autowired
     private PhotoRepository photoRepository;
+    
+    @Autowired
+    private DataSource dataSource;
 
     private final ObjectMapper objectMapper;
     
@@ -75,6 +82,9 @@ public class JsonDataService {
 
     public void loadSpaceFromJson(String filePath) {
         long totalStartTime = System.currentTimeMillis();
+        
+        // MySQL 성능 최적화 설정 적용
+        optimizeMySQLForBulkInsert();
         
         try (FileInputStream fis = new FileInputStream(filePath);
              JsonParser parser = new JsonFactory().createParser(fis)) {
@@ -107,7 +117,11 @@ public class JsonDataService {
                             processedCount++;
                             
                             if (batch.size() >= batchSize) {
+                                long cycleStartTime = System.currentTimeMillis();
                                 processBatch(batch);
+                                long cycleEndTime = System.currentTimeMillis();
+                                long cycleTotalTime = cycleEndTime - cycleStartTime;
+                                
                                 batch.clear();
                                 System.gc(); // 메모리 정리
                                 
@@ -115,8 +129,8 @@ public class JsonDataService {
                                     long currentTime = System.currentTimeMillis();
                                     long elapsedTime = currentTime - totalStartTime;
                                     double avgTimePerSpace = (double) elapsedTime / processedCount;
-                                    System.out.printf("Progress: %d spaces processed in %d ms (avg: %.2f ms/space)\n", 
-                                        processedCount, elapsedTime, avgTimePerSpace);
+                                    System.out.printf("Progress: %d spaces processed in %d ms (avg: %.2f ms/space) | Cycle total: %dms\n", 
+                                        processedCount, elapsedTime, avgTimePerSpace, cycleTotalTime);
                                 }
                             }
                         }
@@ -141,6 +155,9 @@ public class JsonDataService {
             
         } catch (IOException e) {
             throw new RuntimeException("Failed to load space from JSON", e);
+        } finally {
+            // MySQL 설정 원복
+            restoreMySQLSettings();
         }
     }
     
@@ -328,7 +345,7 @@ public class JsonDataService {
         long batchEndTime = System.currentTimeMillis();
         long totalBatchTime = batchEndTime - batchStartTime;
         
-        System.out.printf("Batch: %d spaces (%dms), %d hosts (%dms), %d guests (%dms), %d content (%dms), %d photos (%dms) | Total: %dms\n", 
+        System.out.printf("Batch: %d spaces (%dms), %d hosts (%dms), %d guests (%dms), %d content (%dms), %d photos (%dms) | Cycle Total: %dms\n", 
             spaces.size(), (spaceSaveEnd - spaceSaveStart), 
             hosts.size(), (hostSaveEnd - hostSaveStart), 
             guests.size(), (guestSaveEnd - guestSaveStart),
@@ -345,5 +362,56 @@ public class JsonDataService {
             hostData.getCreatedAt(),
             hostData.getUpdatedAt()
         );
+    }
+    
+    private void optimizeMySQLForBulkInsert() {
+        try (Connection connection = dataSource.getConnection();
+             Statement statement = connection.createStatement()) {
+            
+            System.out.println("Applying MySQL performance optimizations for bulk insert...");
+            
+            // Binary logging 끄기 (복제가 필요 없는 경우)
+            statement.execute("SET sql_log_bin = 0");
+            
+            // 자동 커밋 끄기
+            statement.execute("SET autocommit = 0");
+            
+            // 유니크 체크 끄기
+            statement.execute("SET unique_checks = 0");
+            
+            // 외래키 체크 끄기
+            statement.execute("SET foreign_key_checks = 0");
+            
+            System.out.println("MySQL optimizations applied successfully.");
+            
+        } catch (Exception e) {
+            System.err.println("Failed to apply MySQL optimizations: " + e.getMessage());
+            // 최적화 실패해도 작업은 계속 진행
+        }
+    }
+    
+    private void restoreMySQLSettings() {
+        try (Connection connection = dataSource.getConnection();
+             Statement statement = connection.createStatement()) {
+            
+            System.out.println("Restoring MySQL settings...");
+            
+            // 외래키 체크 복원
+            statement.execute("SET foreign_key_checks = 1");
+            
+            // 유니크 체크 복원
+            statement.execute("SET unique_checks = 1");
+            
+            // 변경사항 커밋
+            statement.execute("COMMIT");
+            
+            // Binary logging 복원
+            statement.execute("SET sql_log_bin = 1");
+            
+            System.out.println("MySQL settings restored successfully.");
+            
+        } catch (Exception e) {
+            System.err.println("Failed to restore MySQL settings: " + e.getMessage());
+        }
     }
 }

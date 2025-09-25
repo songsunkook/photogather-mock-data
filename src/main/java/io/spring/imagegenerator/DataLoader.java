@@ -5,16 +5,19 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
-import io.spring.imagegenerator.service.CsvDataService;
+import io.spring.imagegenerator.service.JsonDataService;
 
 @Component
 public class DataLoader implements CommandLineRunner {
 
     @Autowired
-    private CsvDataService csvDataService;
+    private JsonDataService jsonDataService;
+
+    @Value("${json.file.path:src/main/resources/space_data.json}")
+    private String jsonDataPath;
 
     @Override
     public void run(String... args) throws Exception {
-        csvDataService.loadAllDataFromCsv();
+        jsonDataService.loadSpaceFromJson(jsonDataPath);
     }
 }
