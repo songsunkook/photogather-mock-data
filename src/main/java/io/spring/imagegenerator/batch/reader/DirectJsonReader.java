@@ -12,6 +12,7 @@ import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.NonTransientResourceException;
 import org.springframework.batch.item.ParseException;
 import org.springframework.batch.item.UnexpectedInputException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonFactory;
@@ -21,7 +22,8 @@ import com.fasterxml.jackson.core.JsonToken;
 @Component
 public class DirectJsonReader implements ItemReader<Map<String, Object>> {
     
-    private final String filePath = "src/main/resources/space_data.json";
+    @Value("${json.file.path}")
+    private String filePath;
     private JsonParser parser;
     private boolean initialized = false;
     private int processedCount = 0;

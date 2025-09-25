@@ -96,7 +96,7 @@ public class MultiRowBulkWriter implements ItemWriter<Map<String, Object>> {
                     
                     // SpaceHostMap
                     spaceHostMaps.add(Map.of(
-                        "id", spaceId * 1000,
+                        "id", spaceId,
                         "spaceId", spaceId,
                         "hostId", hostId,
                         "createdAt", now,
@@ -110,7 +110,7 @@ public class MultiRowBulkWriter implements ItemWriter<Map<String, Object>> {
                         String userId = (String) kakaoData.get("userId");
                         if (userId != null && !userId.isEmpty()) {
                             hostKakaos.add(Map.of(
-                                "id", hostId * 1000,
+                                "id", hostId,
                                 "hostId", hostId,
                                 "userId", userId
                             ));
