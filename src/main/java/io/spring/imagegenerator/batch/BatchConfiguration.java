@@ -1,5 +1,7 @@
 package io.spring.imagegenerator.batch;
 
+import java.util.Map;
+
 import javax.sql.DataSource;
 
 import org.springframework.batch.core.Job;
@@ -19,8 +21,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 
-import io.spring.imagegenerator.batch.processor.JsonProcessedData;
-import io.spring.imagegenerator.batch.processor.JsonSpaceProcessor;
+import io.spring.imagegenerator.batch.reader.DirectJsonReader;
 import io.spring.imagegenerator.batch.reader.JsonSpaceItemReader;
 import io.spring.imagegenerator.batch.step.GuestBatchStep;
 import io.spring.imagegenerator.batch.step.HostBatchStep;
@@ -29,8 +30,8 @@ import io.spring.imagegenerator.batch.step.PhotoBatchStep;
 import io.spring.imagegenerator.batch.step.SpaceBatchStep;
 import io.spring.imagegenerator.batch.step.SpaceContentBatchStep;
 import io.spring.imagegenerator.batch.step.SpaceHostMapBatchStep;
-import io.spring.imagegenerator.batch.writer.JsonDataWriter;
-import io.spring.imagegenerator.dto.JsonSpaceData;
+import io.spring.imagegenerator.batch.writer.RawDataWriter;
+import io.spring.imagegenerator.batch.writer.MultiRowBulkWriter;
 import io.spring.imagegenerator.entity.Guest;
 import io.spring.imagegenerator.entity.Host;
 import io.spring.imagegenerator.entity.HostKakao;
@@ -67,10 +68,13 @@ public class BatchConfiguration {
     private PhotoBatchStep photoBatchStep;
 
     @Autowired
-    private JsonSpaceProcessor jsonSpaceProcessor;
-
+    private RawDataWriter rawDataWriter;
+    
     @Autowired
-    private JsonDataWriter jsonDataWriter;
+    private MultiRowBulkWriter multiRowBulkWriter;
+    
+    @Autowired
+    private DirectJsonReader directJsonReader;
     
     @Value("${json.file.path}")
     private String jsonFilePath;
@@ -226,11 +230,13 @@ public class BatchConfiguration {
         return new ProgressReportingWriter<>("Photos", jdbcWriter, 10000);
     }
 
+/*
     @Bean
     public Job csvImportJob(JobRepository jobRepository, Step spaceStep, Step hostStep, 
                            Step spaceHostMapStep, Step hostKakaoStep, Step guestStep, 
                            Step spaceContentStep, Step photoStep) {
         return new JobBuilder("csvImportJob", jobRepository)
+                .listener(mysqlOptimizationListener)
                 .start(spaceStep)
                 .next(hostStep)
                 .next(spaceHostMapStep)
@@ -240,6 +246,7 @@ public class BatchConfiguration {
                 .next(photoStep)
                 .build();
     }
+*/
 
     @Bean
     public Job jsonImportJob(JobRepository jobRepository, Step jsonProcessingStep) {
@@ -334,10 +341,9 @@ public class BatchConfiguration {
     @Bean
     public Step jsonProcessingStep(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         return new StepBuilder("jsonProcessingStep", jobRepository)
-                .<JsonSpaceData.SpaceData, JsonProcessedData>chunk(100, transactionManager)
-                .reader(jsonSpaceItemReader())
-                .processor(jsonSpaceProcessor)
-                .writer(jsonDataWriter)
+                .<Map<String, Object>, Map<String, Object>>chunk(100, transactionManager)
+                .reader(directJsonReader)
+                .writer(multiRowBulkWriter)
                 .build();
     }
 

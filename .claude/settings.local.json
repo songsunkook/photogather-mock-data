@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(java:*)",
-      "Bash(mysql:*)"
+      "Bash(mysql:*)",
+      "Bash(find:*)",
+      "Bash(./gradlew:*)"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [

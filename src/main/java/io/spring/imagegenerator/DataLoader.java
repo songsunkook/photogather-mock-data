@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 
 import io.spring.imagegenerator.service.CsvDataService;
 import io.spring.imagegenerator.service.JsonDataService;
+import io.spring.imagegenerator.test.MysqlOptimizationTest;
 
 @Component
 public class DataLoader implements CommandLineRunner {
@@ -17,6 +18,9 @@ public class DataLoader implements CommandLineRunner {
     @Autowired
     private JsonDataService jsonDataService;
     
+    @Autowired
+    private MysqlOptimizationTest mysqlTest;
+    
     @Value("${csv.data.path}")
     private String csvDataPath;
     
@@ -25,6 +29,9 @@ public class DataLoader implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
+        
+        // MySQL 최적화 테스트
+        mysqlTest.testOptimizationSettings();
         
         long totalStartTime = System.currentTimeMillis();
         
