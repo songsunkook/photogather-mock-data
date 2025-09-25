@@ -16,6 +16,7 @@ import org.springframework.batch.core.repository.JobExecutionAlreadyRunningExcep
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -34,8 +35,35 @@ public class JsonDataService {
     @Autowired
     private JobRepository jobRepository;
     
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+    
+    private void applyMySQLOptimizations() {
+        try {
+            jdbcTemplate.execute("SET sql_log_bin = 0");
+            jdbcTemplate.execute("SET autocommit = 0");
+            jdbcTemplate.execute("SET unique_checks = 0");
+            jdbcTemplate.execute("SET foreign_key_checks = 0");
+        } catch (Exception e) {
+            System.out.printf("MySQL optimization settings failed: %s%n", e.getMessage());
+        }
+    }
+    
+    private void restoreMySQLDefaults() {
+        try {
+            jdbcTemplate.execute("SET sql_log_bin = 1");
+            jdbcTemplate.execute("SET autocommit = 1");
+            jdbcTemplate.execute("SET unique_checks = 1");
+            jdbcTemplate.execute("SET foreign_key_checks = 1");
+        } catch (Exception e) {
+            System.out.printf("MySQL default settings restoration failed: %s%n", e.getMessage());
+        }
+    }
+    
     public void executeJsonDataImport() {
         try {
+            // Apply MySQL optimizations before processing
+            applyMySQLOptimizations();
             // JobParameters jobParameters = new JobParametersBuilder()
             //         .addLong("time", System.currentTimeMillis())
             //         .toJobParameters();
@@ -200,6 +228,9 @@ public class JsonDataService {
             System.err.println("Failed to execute JSON import batch job: " + e.getMessage());
             e.printStackTrace();
             throw new RuntimeException("Batch job execution failed", e);
+        } finally {
+            // Restore MySQL defaults after completion
+            restoreMySQLDefaults();
         }
     }
 }
