@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class DataLoader implements CommandLineRunner {
@@ -67,72 +68,21 @@ public class DataLoader implements CommandLineRunner {
                 long cycleStartTime = System.currentTimeMillis();
                 boolean dataLoadedInCycle = false;
                 StringBuilder cycleLog = new StringBuilder();
-
-                // 1. Spaces (100) - 순차적으로 먼저 삽입
-                List<Space> spaces = csvDataService.loadSpacesFromCsv(spaceReader, 100);
-                if (!spaces.isEmpty()) {
-                    dataLoadedInCycle = true;
-                    jdbcBulkInsertService.bulkInsertSpaces(spaces);
-                    cycleLog.append(String.format("Spaces: %d/%d | ", spaces.size(), totalSpaces.addAndGet(spaces.size())));
-                }
-
-                // 2. Hosts (100) - 두 번째로 삽입
-                List<Host> hosts = csvDataService.loadHostsFromCsv(hostReader, 100);
-                if (!hosts.isEmpty()) {
-                    dataLoadedInCycle = true;
-                    jdbcBulkInsertService.bulkInsertHosts(hosts);
-                    cycleLog.append(String.format("Hosts: %d/%d | ", hosts.size(), totalHosts.addAndGet(hosts.size())));
-                }
-
-                // 3. SpaceHostMaps (100) - Space와 Host가 있어야 삽입 가능
-                List<SpaceHostMap> spaceHostMaps = csvDataService.loadSpaceHostMapsFromCsv(spaceHostMapReader, 100);
-                if (!spaceHostMaps.isEmpty()) {
-                    dataLoadedInCycle = true;
-                    jdbcBulkInsertService.bulkInsertSpaceHostMaps(spaceHostMaps);
-                    cycleLog.append(String.format("SpaceHostMaps: %d/%d | ", spaceHostMaps.size(), totalSpaceHostMaps.addAndGet(spaceHostMaps.size())));
-                }
-
-                // 4. HostKakaos (100) - Host가 있어야 삽입 가능
-                List<HostKakao> hostKakaos = csvDataService.loadHostKakaosFromCsv(hostKakaoReader, 100);
-                if (!hostKakaos.isEmpty()) {
-                    dataLoadedInCycle = true;
-                    jdbcBulkInsertService.bulkInsertHostKakaos(hostKakaos);
-                    cycleLog.append(String.format("HostKakaos: %d/%d | ", hostKakaos.size(), totalHostKakaos.addAndGet(hostKakaos.size())));
-                }
-
-                // 5. Guests (1000) - Space가 있어야 삽입 가능
-                List<Guest> guests = csvDataService.loadGuestsFromCsv(guestReader, 1000);
-                if (!guests.isEmpty()) {
-                    dataLoadedInCycle = true;
-                    jdbcBulkInsertService.bulkInsertGuests(guests);
-                    cycleLog.append(String.format("Guests: %d/%d | ", guests.size(), totalGuests.addAndGet(guests.size())));
-                }
-
-                // 6. SpaceContents (20000) - Space와 Guest가 있어야 삽입 가능
-                List<SpaceContent> spaceContents = csvDataService.loadSpaceContentsFromCsv(spaceContentReader, 20000);
-                if (!spaceContents.isEmpty()) {
-                    dataLoadedInCycle = true;
-                    jdbcBulkInsertService.bulkInsertSpaceContents(spaceContents);
-                    cycleLog.append(String.format("SpaceContents: %d/%d | ", spaceContents.size(), totalSpaceContents.addAndGet(spaceContents.size())));
-                }
-
-                // 7. Photos (20000) - 마지막에 삽입
-                List<Photo> photos = csvDataService.loadPhotosFromCsv(photoReader, 20000);
-                if (!photos.isEmpty()) {
-                    dataLoadedInCycle = true;
-                    jdbcBulkInsertService.bulkInsertPhotos(photos);
-                    cycleLog.append(String.format("Photos: %d/%d | ", photos.size(), totalPhotos.addAndGet(photos.size())));
-                }
-
-                if (!dataLoadedInCycle) {
+                
+                processCycleInTransaction(spaceReader, hostReader, spaceHostMapReader, 
+                    hostKakaoReader, guestReader, spaceContentReader, photoReader, 
+                    cycleLog, totalSpaces, totalHosts, totalSpaceHostMaps, 
+                    totalHostKakaos, totalGuests, totalSpaceContents, totalPhotos);
+                
+                if (cycleLog.length() == 0) {
                     System.out.println("\n--- All files have been read. Finishing process. ---");
                     break;
                 }
-
-                long cycleDuration = System.currentTimeMillis() - cycleStartTime;
+                
                 if (cycleLog.length() > 0) {
                     cycleLog.setLength(cycleLog.length() - 3);
                 }
+                long cycleDuration = System.currentTimeMillis() - cycleStartTime;
                 System.out.printf("Cycle %d (%dms): [ %s ]\n", cycle, cycleDuration, cycleLog.toString());
             }
         }
@@ -153,5 +103,63 @@ public class DataLoader implements CommandLineRunner {
             totalSpaces.get(), totalHosts.get(), totalSpaceHostMaps.get(), totalHostKakaos.get(),
             totalGuests.get(), totalSpaceContents.get(), totalPhotos.get());
         System.out.println("--------------------------------------------------");
+    }
+    
+    @Transactional
+    private void processCycleInTransaction(CSVReader spaceReader, CSVReader hostReader, 
+            CSVReader spaceHostMapReader, CSVReader hostKakaoReader, CSVReader guestReader, 
+            CSVReader spaceContentReader, CSVReader photoReader, StringBuilder cycleLog,
+            AtomicLong totalSpaces, AtomicLong totalHosts, AtomicLong totalSpaceHostMaps,
+            AtomicLong totalHostKakaos, AtomicLong totalGuests, 
+            AtomicLong totalSpaceContents, AtomicLong totalPhotos) {
+
+        // 1. Spaces (100) - 순차적으로 먼저 삽입
+        List<Space> spaces = csvDataService.loadSpacesFromCsv(spaceReader, 100);
+        if (!spaces.isEmpty()) {
+            jdbcBulkInsertService.bulkInsertSpaces(spaces);
+            cycleLog.append(String.format("Spaces: %d/%d | ", spaces.size(), totalSpaces.addAndGet(spaces.size())));
+        }
+
+        // 2. Hosts (100) - 두 번째로 삽입
+        List<Host> hosts = csvDataService.loadHostsFromCsv(hostReader, 100);
+        if (!hosts.isEmpty()) {
+            jdbcBulkInsertService.bulkInsertHosts(hosts);
+            cycleLog.append(String.format("Hosts: %d/%d | ", hosts.size(), totalHosts.addAndGet(hosts.size())));
+        }
+
+        // 3. SpaceHostMaps (100) - Space와 Host가 있어야 삽입 가능
+        List<SpaceHostMap> spaceHostMaps = csvDataService.loadSpaceHostMapsFromCsv(spaceHostMapReader, 100);
+        if (!spaceHostMaps.isEmpty()) {
+            jdbcBulkInsertService.bulkInsertSpaceHostMaps(spaceHostMaps);
+            cycleLog.append(String.format("SpaceHostMaps: %d/%d | ", spaceHostMaps.size(), totalSpaceHostMaps.addAndGet(spaceHostMaps.size())));
+        }
+
+        // 4. HostKakaos (100) - Host가 있어야 삽입 가능
+        List<HostKakao> hostKakaos = csvDataService.loadHostKakaosFromCsv(hostKakaoReader, 100);
+        if (!hostKakaos.isEmpty()) {
+            jdbcBulkInsertService.bulkInsertHostKakaos(hostKakaos);
+            cycleLog.append(String.format("HostKakaos: %d/%d | ", hostKakaos.size(), totalHostKakaos.addAndGet(hostKakaos.size())));
+        }
+
+        // 5. Guests (1000) - Space가 있어야 삽입 가능
+        List<Guest> guests = csvDataService.loadGuestsFromCsv(guestReader, 1000);
+        if (!guests.isEmpty()) {
+            jdbcBulkInsertService.bulkInsertGuests(guests);
+            cycleLog.append(String.format("Guests: %d/%d | ", guests.size(), totalGuests.addAndGet(guests.size())));
+        }
+
+        // 6. SpaceContents (20000) - Space와 Guest가 있어야 삽입 가능
+        List<SpaceContent> spaceContents = csvDataService.loadSpaceContentsFromCsv(spaceContentReader, 20000);
+        if (!spaceContents.isEmpty()) {
+            jdbcBulkInsertService.bulkInsertSpaceContents(spaceContents);
+            cycleLog.append(String.format("SpaceContents: %d/%d | ", spaceContents.size(), totalSpaceContents.addAndGet(spaceContents.size())));
+        }
+
+        // 7. Photos (20000) - 마지막에 삽입
+        List<Photo> photos = csvDataService.loadPhotosFromCsv(photoReader, 20000);
+        if (!photos.isEmpty()) {
+            jdbcBulkInsertService.bulkInsertPhotos(photos);
+            cycleLog.append(String.format("Photos: %d/%d | ", photos.size(), totalPhotos.addAndGet(photos.size())));
+        }
     }
 }
